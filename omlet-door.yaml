@@ -1,0 +1,88 @@
+# Example configuration for the Omlet Smart Autodoor control panel (board X107).
+# Pin assignments come from the stock firmware, see README.md.
+
+esphome:
+  name: coop-door
+  friendly_name: Coop Door
+
+esp32:
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://swoboda1337/omlet-esphome
+    components: [omlet_door]
+
+logger:
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# Motor current: shunt amplifier output, only enabled while the door moves.
+sensor:
+  - platform: adc
+    id: motor_current
+    pin: GPIO9
+    attenuation: 12db
+    update_interval: never
+    internal: true
+
+binary_sensor:
+  - platform: gpio
+    id: crush_switch
+    name: Crush Switch
+    pin:
+      number: GPIO40
+      mode: input
+      # invert here if the switch reads active-low on your board
+    device_class: problem
+
+  - platform: gpio
+    name: Mains Power
+    pin:
+      number: GPIO48
+      mode: input
+    device_class: power
+
+cover:
+  - platform: omlet_door
+    id: coop_door
+    name: Door
+    high_side_a: GPIO13
+    low_side_a: GPIO12
+    high_side_b: GPIO11
+    low_side_b: GPIO14
+    current_sampler: motor_current
+    current_enable_pin: GPIO45
+    crush_switch: crush_switch
+    # Set to true if "open" drives the door the wrong way.
+    invert_direction: false
+    max_duration: 30s
+    start_sensing_delay: 300ms
+    stall_time: 100ms
+    # Leave stall_threshold unset to use the value learned by calibration.
+    stall_ratio: 2.0
+    max_crush_retries: 3
+    crush_retry_delay: 10s
+
+button:
+  - platform: template
+    name: Calibrate Door
+    on_press:
+      - omlet_door.calibrate: coop_door
+
+light:
+  - platform: binary
+    name: Coop Light
+    output: coop_light_out
+
+output:
+  - platform: gpio
+    id: coop_light_out
+    pin: GPIO8
