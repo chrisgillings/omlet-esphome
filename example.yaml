@@ -14,7 +14,9 @@ packages:
 #   lcd_contrast: "30"
 
 logger:
+
 api:
+
 ota:
   - platform: esphome
 

@@ -27,7 +27,9 @@ packages:
   omlet: github://swoboda1337/omlet-esphome/omlet-door.yaml@main
 
 logger:
+
 api:
+
 ota:
   - platform: esphome
 
