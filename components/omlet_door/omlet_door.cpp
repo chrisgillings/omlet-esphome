@@ -24,8 +24,9 @@ using cover::COVER_OPERATION_IDLE;
 using cover::COVER_OPERATION_OPENING;
 
 void IRAM_ATTR CrushIsrStore::gpio_intr(CrushIsrStore *arg) {
-  if (!arg->closing || !arg->crush.digital_read())
+  if (!arg->closing || !arg->crush.digital_read()) {
     return;
+  }
   arg->high_side_a.digital_write(false);
   arg->high_side_b.digital_write(false);
   arg->low_side_a.digital_write(false);
@@ -54,10 +55,12 @@ void OmletDoor::setup() {
       global_preferences->make_preference<CalibrationData>(this->get_object_id_hash() ^ CAL_PREF_SALT, true);
   CalibrationData cal{};
   if (this->cal_pref_.load(&cal)) {
-    if (this->open_duration_ == 0)
+    if (this->open_duration_ == 0) {
       this->open_duration_ = cal.open_ms;
-    if (this->close_duration_ == 0)
+    }
+    if (this->close_duration_ == 0) {
       this->close_duration_ = cal.close_ms;
+    }
     this->learned_threshold_ = cal.threshold;
   }
 
@@ -80,14 +83,16 @@ void OmletDoor::loop() {
 
   if (this->drive_pending_ && now - this->drive_pending_since_ >= DEAD_TIME_MS) {
     this->drive_pending_ = false;
-    if (!(this->isr_store_.closing && this->crush_active_()))
+    if (!(this->isr_store_.closing && this->crush_active_())) {
       this->apply_drive_(this->pending_drive_);
+    }
   }
 
   switch (this->state_) {
     case State::MOVING: {
-      if (this->drive_pending_)
+      if (this->drive_pending_) {
         break;
+      }
       const uint32_t elapsed = now - this->move_start_;
 
       if (now - this->last_sample_ >= SAMPLE_INTERVAL_MS) {
@@ -116,8 +121,9 @@ void OmletDoor::loop() {
         break;
       }
 
-      if (this->update_position_(now))
+      if (this->update_position_(now)) {
         break;
+      }
 
       const uint32_t duration =
           this->move_op_ == COVER_OPERATION_OPENING ? this->open_duration_ : this->close_duration_;
@@ -141,8 +147,9 @@ void OmletDoor::loop() {
     }
 
     case State::RETRY_WAIT: {
-      if (static_cast<int32_t>(now - this->retry_at_) < 0)
+      if (static_cast<int32_t>(now - this->retry_at_) < 0) {
         break;
+      }
       if (this->crush_active_()) {
         ESP_LOGW(TAG, "Still crushed, delaying re-close");
         this->retry_at_ = now + this->crush_retry_delay_;
@@ -191,21 +198,25 @@ cover::CoverTraits OmletDoor::get_traits() {
 
 void OmletDoor::control(const cover::CoverCall &call) {
   if (call.get_stop()) {
-    if (this->state_ == State::MOVING)
+    if (this->state_ == State::MOVING) {
       this->stop_move_();
+    }
     this->state_ = State::IDLE;
     this->purpose_ = Purpose::NORMAL;
     this->publish_state();
     return;
   }
-  if (!call.get_position().has_value())
+  if (!call.get_position().has_value()) {
     return;
+  }
 
   const float pos = *call.get_position();
-  if (this->state_ == State::FAULT)
+  if (this->state_ == State::FAULT) {
     ESP_LOGI(TAG, "Clearing fault state on new command");
-  if (this->state_ == State::MOVING)
+  }
+  if (this->state_ == State::MOVING) {
     this->stop_move_();
+  }
   this->state_ = State::IDLE;
   this->crush_count_ = 0;
   this->target_position_ = pos;
@@ -219,8 +230,9 @@ void OmletDoor::control(const cover::CoverCall &call) {
 }
 
 void OmletDoor::calibrate() {
-  if (this->state_ == State::MOVING)
+  if (this->state_ == State::MOVING) {
     this->stop_move_();
+  }
   this->state_ = State::IDLE;
   this->crush_count_ = 0;
   ESP_LOGI(TAG, "Calibration started: closing until end stop");
@@ -243,8 +255,9 @@ void OmletDoor::start_move_(cover::CoverOperation op, Purpose purpose) {
   this->isr_store_.tripped = false;
   this->isr_store_.closing = op == COVER_OPERATION_CLOSING;
   this->current_operation = op;
-  if (this->current_enable_pin_ != nullptr)
+  if (this->current_enable_pin_ != nullptr) {
     this->current_enable_pin_->digital_write(true);
+  }
   const bool forward = (op == COVER_OPERATION_OPENING) != this->invert_direction_;
   this->set_drive_(forward ? Drive::FORWARD : Drive::REVERSE);
   this->high_freq_.start();
@@ -256,8 +269,9 @@ void OmletDoor::stop_move_() {
   this->set_drive_(Drive::BRAKE);
   this->state_ = State::IDLE;
   this->current_operation = COVER_OPERATION_IDLE;
-  if (this->current_enable_pin_ != nullptr)
+  if (this->current_enable_pin_ != nullptr) {
     this->current_enable_pin_->digital_write(false);
+  }
   this->high_freq_.stop();
 }
 
@@ -271,8 +285,9 @@ void OmletDoor::set_drive_(Drive drive) {
 void OmletDoor::apply_drive_(Drive drive) {
   // Keep the four writes atomic with respect to the crush ISR, which clears all of them.
   InterruptLock lock;
-  if (this->isr_store_.tripped && (drive == Drive::FORWARD || drive == Drive::REVERSE))
+  if (this->isr_store_.tripped && (drive == Drive::FORWARD || drive == Drive::REVERSE)) {
     drive = Drive::OFF;
+  }
   this->high_side_a_->digital_write(drive == Drive::FORWARD);
   this->high_side_b_->digital_write(drive == Drive::REVERSE);
   this->low_side_a_->digital_write(drive == Drive::REVERSE || drive == Drive::BRAKE);
@@ -281,16 +296,18 @@ void OmletDoor::apply_drive_(Drive drive) {
 
 void OmletDoor::sample_current_() {
   const float v = this->current_sampler_->sample();
-  if (std::isnan(v))
+  if (std::isnan(v)) {
     return;
+  }
   if (!this->filter_primed_) {
     this->filtered_current_ = v;
     this->filter_primed_ = true;
   } else {
     this->filtered_current_ += FILTER_ALPHA * (v - this->filtered_current_);
   }
-  if (millis() - this->move_start_ < this->start_sensing_delay_)
+  if (millis() - this->move_start_ < this->start_sensing_delay_) {
     return;
+  }
   const float threshold = this->effective_threshold_();
   if (threshold > 0.0f && this->filtered_current_ > threshold) {
     if (!this->above_) {
@@ -305,13 +322,16 @@ void OmletDoor::sample_current_() {
 }
 
 float OmletDoor::effective_threshold_() const {
-  if (this->stall_threshold_ > 0.0f)
+  if (this->stall_threshold_ > 0.0f) {
     return this->stall_threshold_;
+  }
   const bool calibrating = this->purpose_ == Purpose::CALIBRATE_OPEN || this->purpose_ == Purpose::CALIBRATE_CLOSE;
-  if (!calibrating && this->learned_threshold_ > 0.0f)
+  if (!calibrating && this->learned_threshold_ > 0.0f) {
     return this->learned_threshold_;
-  if (this->running_count_ >= MIN_SAMPLES_FOR_RATIO)
+  }
+  if (this->running_count_ >= MIN_SAMPLES_FOR_RATIO) {
     return (this->running_sum_ / this->running_count_) * this->stall_ratio_;
+  }
   return 0.0f;
 }
 
@@ -331,8 +351,9 @@ void OmletDoor::on_end_stop_() {
       ESP_LOGI(TAG, "Calibration: close took %" PRIu32 " ms, running %.3f V, stall %.3f V", elapsed, mean,
                this->stall_level_);
       this->set_timeout(CALIBRATION_PAUSE_MS, [this]() {
-        if (this->state_ == State::IDLE && this->purpose_ == Purpose::CALIBRATE_CLOSE)
+        if (this->state_ == State::IDLE && this->purpose_ == Purpose::CALIBRATE_CLOSE) {
           this->start_move_(COVER_OPERATION_OPENING, Purpose::CALIBRATE_OPEN);
+        }
       });
       break;
     case Purpose::CALIBRATE_OPEN:
@@ -353,8 +374,9 @@ void OmletDoor::on_end_stop_() {
       this->retry_at_ = millis() + this->crush_retry_delay_;
       break;
     case Purpose::NORMAL:
-      if (this->move_op_ == COVER_OPERATION_CLOSING)
+      if (this->move_op_ == COVER_OPERATION_CLOSING) {
         this->crush_count_ = 0;
+      }
       break;
   }
   this->publish_state();
@@ -375,8 +397,9 @@ void OmletDoor::on_timeout_() {
 void OmletDoor::on_obstruction_() {
   this->crush_count_++;
   const bool calibrating = this->purpose_ == Purpose::CALIBRATE_OPEN || this->purpose_ == Purpose::CALIBRATE_CLOSE;
-  if (calibrating)
+  if (calibrating) {
     ESP_LOGE(TAG, "Calibration aborted by obstruction");
+  }
   this->stop_move_();
   ESP_LOGW(TAG, "Obstruction while closing (%u of %u), reopening", this->crush_count_, this->max_crush_retries_);
   this->start_move_(COVER_OPERATION_OPENING, Purpose::CRUSH_REOPEN);
@@ -386,8 +409,9 @@ bool OmletDoor::update_position_(uint32_t now) {
   const uint32_t duration = this->move_op_ == COVER_OPERATION_OPENING ? this->open_duration_ : this->close_duration_;
   const uint32_t dt = now - this->last_position_update_;
   this->last_position_update_ = now;
-  if (duration == 0)
+  if (duration == 0) {
     return false;
+  }
   const float delta = static_cast<float>(dt) / static_cast<float>(duration);
   if (this->move_op_ == COVER_OPERATION_OPENING) {
     this->position = std::min(COVER_OPEN, this->position + delta);
@@ -395,12 +419,14 @@ bool OmletDoor::update_position_(uint32_t now) {
     this->position = std::max(COVER_CLOSED, this->position - delta);
   }
   if (this->purpose_ != Purpose::NORMAL || this->target_position_ == COVER_OPEN ||
-      this->target_position_ == COVER_CLOSED)
+      this->target_position_ == COVER_CLOSED) {
     return false;
+  }
   const bool reached = this->move_op_ == COVER_OPERATION_OPENING ? this->position >= this->target_position_
                                                                  : this->position <= this->target_position_;
-  if (!reached)
+  if (!reached) {
     return false;
+  }
   this->stop_move_();
   this->position = this->target_position_;
   this->publish_state();
