@@ -80,7 +80,8 @@ void OmletDoor::loop() {
 
   if (this->drive_pending_ && now - this->drive_pending_since_ >= DEAD_TIME_MS) {
     this->drive_pending_ = false;
-    this->apply_drive_(this->pending_drive_);
+    if (!(this->isr_store_.closing && this->crush_active_()))
+      this->apply_drive_(this->pending_drive_);
   }
 
   switch (this->state_) {
@@ -268,6 +269,10 @@ void OmletDoor::set_drive_(Drive drive) {
 }
 
 void OmletDoor::apply_drive_(Drive drive) {
+  // Keep the four writes atomic with respect to the crush ISR, which clears all of them.
+  InterruptLock lock;
+  if (this->isr_store_.tripped && (drive == Drive::FORWARD || drive == Drive::REVERSE))
+    drive = Drive::OFF;
   this->high_side_a_->digital_write(drive == Drive::FORWARD);
   this->high_side_b_->digital_write(drive == Drive::REVERSE);
   this->low_side_a_->digital_write(drive == Drive::REVERSE || drive == Drive::BRAKE);
