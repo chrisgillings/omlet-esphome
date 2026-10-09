@@ -6,7 +6,43 @@ The stock control panel is an ESP32-S3 that only talks to Omlet's cloud. This pr
 ESPHome so the door works fully locally with Home Assistant. The stock module has no secure boot and no flash
 encryption, so it can be flashed over the serial header and restored from a backup at any time.
 
-Status: hardware fully mapped from the stock firmware (1.0.55), ESPHome config not written yet.
+Status: hardware mapped from the stock firmware (1.0.55), components written and compiling, not yet bench-tested.
+
+## Usage
+
+Everything board-specific lives in the `omlet-door.yaml` package. Your own config only needs a name, networking
+and the package line:
+
+```yaml
+esphome:
+  name: coop-door
+  friendly_name: Coop Door
+
+packages:
+  omlet: github://swoboda1337/omlet-esphome/omlet-door.yaml@main
+
+logger:
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+```
+
+See `example.yaml`. Tunables such as `invert_direction`, `crush_inverted`, `lcd_contrast` and the stall timing are
+substitutions at the top of the package; set them in your own `substitutions:` block to override.
+
+The package provides:
+
+- `cover` for the door (`omlet_door` platform): time-of-flight position, current-sensed end stops, crush switch
+  cut in an interrupt, automatic reopen and retry, brake when parked, and an `omlet_door.calibrate` action.
+- `button` "Calibrate Door" that runs calibration (close to stop, open to stop, learn the thresholds).
+- `light` "Coop Light" on the COOP LIGHT connector.
+- `binary_sensor` for the crush switch and 12 V mains presence.
+- The three front buttons wired to toggle the door, toggle the light, and stop.
+- `display` on the built-in LCD (`lcd_st7032` platform) showing door state.
 
 ## Hardware
 

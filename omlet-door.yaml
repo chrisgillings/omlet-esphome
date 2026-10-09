@@ -1,9 +1,28 @@
-# Example configuration for the Omlet Smart Autodoor control panel (board X107).
-# Pin assignments come from the stock firmware, see README.md.
+# ESPHome package for the Omlet Smart Automatic Chicken Coop Door control panel (board X107).
+#
+# Use it from your own config:
+#
+#   packages:
+#     omlet: github://swoboda1337/omlet-esphome/omlet-door.yaml@main
+#
+# Override any of the substitutions below in your own config to tune the door.
 
-esphome:
-  name: coop-door
-  friendly_name: Coop Door
+substitutions:
+  door_name: Door
+  # Set to "true" if "open" drives the door the wrong way.
+  invert_direction: "false"
+  # Set to "true" if the crush switch reads active-low on your board.
+  crush_inverted: "false"
+  max_duration: 30s
+  start_sensing_delay: 300ms
+  stall_time: 100ms
+  stall_ratio: "2.0"
+  max_crush_retries: "3"
+  crush_retry_delay: 10s
+  lcd_contrast: "22"
+  # The stock firmware drives GPIO7 low to power the display.
+  lcd_enable_inverted: "true"
+  lcd_backlight_inverted: "false"
 
 esp32:
   variant: esp32s3
@@ -15,114 +34,144 @@ external_components:
   - source: github://swoboda1337/omlet-esphome
     components: [omlet_door, lcd_st7032]
 
-logger:
-api:
-ota:
-  - platform: esphome
+i2c:
+  sda: GPIO5
+  scl: GPIO4
+  frequency: 100kHz
 
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+output:
+  - platform: gpio
+    id: omlet_coop_light_output
+    pin: GPIO8
 
-# Motor current: shunt amplifier output, only enabled while the door moves.
+light:
+  - platform: binary
+    id: omlet_coop_light
+    name: Coop Light
+    output: omlet_coop_light_output
+
 sensor:
+  # Motor current from the shunt amplifier; only enabled while the door moves.
   - platform: adc
-    id: motor_current
+    id: omlet_motor_current
     pin: GPIO9
     attenuation: 12db
     update_interval: never
     internal: true
 
 binary_sensor:
-  # Optional: expose the crush switch to Home Assistant as well. The cover owns the
-  # interrupt on this pin, so both uses must set allow_other_uses.
   - platform: gpio
+    id: omlet_crush_switch
     name: Crush Switch
     pin:
       number: GPIO40
       mode: input
+      inverted: ${crush_inverted}
       allow_other_uses: true
     device_class: problem
 
   - platform: gpio
+    id: omlet_mains_power
     name: Mains Power
     pin:
       number: GPIO48
       mode: input
     device_class: power
 
+  - platform: gpio
+    id: omlet_button_1
+    name: Button 1
+    pin:
+      number: GPIO21
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    internal: true
+    on_press:
+      - cover.toggle: omlet_coop_door
+
+  - platform: gpio
+    id: omlet_button_2
+    name: Button 2
+    pin:
+      number: GPIO17
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    internal: true
+    on_press:
+      - light.toggle: omlet_coop_light
+
+  - platform: gpio
+    id: omlet_button_3
+    name: Button 3
+    pin:
+      number: GPIO18
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    internal: true
+    on_press:
+      - cover.stop: omlet_coop_door
+
 cover:
   - platform: omlet_door
-    id: coop_door
-    name: Door
+    id: omlet_coop_door
+    name: ${door_name}
     high_side_a: GPIO13
     low_side_a: GPIO12
     high_side_b: GPIO11
     low_side_b: GPIO14
-    current_sampler: motor_current
+    current_sampler: omlet_motor_current
     current_enable_pin: GPIO45
-    # Crush switch on the yellow pair of the DOOR connector. The ISR cuts the motor
-    # the moment it closes while the door is closing. Add "inverted: true" if the
-    # switch reads active-low on your board.
     crush_pin:
       number: GPIO40
       mode: input
+      inverted: ${crush_inverted}
       allow_other_uses: true
-    # Set to true if "open" drives the door the wrong way.
-    invert_direction: false
-    max_duration: 30s
-    start_sensing_delay: 300ms
-    stall_time: 100ms
-    # Leave stall_threshold unset to use the value learned by calibration.
-    stall_ratio: 2.0
-    max_crush_retries: 3
-    crush_retry_delay: 10s
+    invert_direction: ${invert_direction}
+    max_duration: ${max_duration}
+    start_sensing_delay: ${start_sensing_delay}
+    stall_time: ${stall_time}
+    stall_ratio: ${stall_ratio}
+    max_crush_retries: ${max_crush_retries}
+    crush_retry_delay: ${crush_retry_delay}
 
 button:
   - platform: template
+    id: omlet_calibrate
     name: Calibrate Door
+    entity_category: config
     on_press:
-      - omlet_door.calibrate: coop_door
-
-i2c:
-  sda: GPIO5
-  scl: GPIO4
-  frequency: 100kHz
+      - omlet_door.calibrate: omlet_coop_door
 
 display:
   - platform: lcd_st7032
-    id: lcd
+    id: omlet_lcd
     dimensions: 16x2
     address: 0x3E
-    # GPIO7 is driven low by the stock firmware to power the display; adjust
-    # "inverted" if yours stays dark.
     enable_pin:
       number: GPIO7
-      inverted: true
+      inverted: ${lcd_enable_inverted}
     reset_pin: GPIO6
-    backlight_pin: GPIO47
-    contrast: 22
+    backlight_pin:
+      number: GPIO47
+      inverted: ${lcd_backlight_inverted}
+    contrast: ${lcd_contrast}
     update_interval: 1s
     lambda: |-
       it.print(0, 0, "Coop Door");
-      if (id(coop_door).current_operation == COVER_OPERATION_OPENING) {
+      if (id(omlet_coop_door).current_operation == COVER_OPERATION_OPENING) {
         it.print(0, 1, "Opening...");
-      } else if (id(coop_door).current_operation == COVER_OPERATION_CLOSING) {
+      } else if (id(omlet_coop_door).current_operation == COVER_OPERATION_CLOSING) {
         it.print(0, 1, "Closing...");
-      } else if (id(coop_door).is_fully_open()) {
+      } else if (id(omlet_coop_door).is_fully_open()) {
         it.print(0, 1, "Open");
-      } else if (id(coop_door).is_fully_closed()) {
+      } else if (id(omlet_coop_door).is_fully_closed()) {
         it.print(0, 1, "Closed");
       } else {
-        it.printf(0, 1, "%.0f%%", id(coop_door).position * 100);
+        it.printf(0, 1, "%.0f%%", id(omlet_coop_door).position * 100);
       }
-
-light:
-  - platform: binary
-    name: Coop Light
-    output: coop_light_out
-
-output:
-  - platform: gpio
-    id: coop_light_out
-    pin: GPIO8

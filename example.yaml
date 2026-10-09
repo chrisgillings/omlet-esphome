@@ -1,0 +1,23 @@
+# Minimal config for an Omlet Smart Autodoor running ESPHome.
+# Everything board-specific comes from the package.
+
+esphome:
+  name: coop-door
+  friendly_name: Coop Door
+
+packages:
+  omlet: github://swoboda1337/omlet-esphome/omlet-door.yaml@main
+
+# Optional overrides, see the substitutions at the top of omlet-door.yaml.
+# substitutions:
+#   invert_direction: "true"
+#   lcd_contrast: "30"
+
+logger:
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
