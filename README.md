@@ -130,6 +130,12 @@ Init after the reset pulse on GPIO6:
 Cursor is `0x80 | col` for line 1 and `0xC0 | col` for line 2. Custom glyphs are loaded through CGRAM
 (`0x40 | (index << 3)` then eight rows).
 
+## Planned
+
+- Battery operation with deep sleep: decide at boot from the mains-detect pin, timer wake every ten minutes plus
+  button wake on GPIO21/17/18, never sleep while the door is moving, compute sleep length from the next scheduled
+  open or close, sample the light sensor on each wake.
+
 ## Flashing and recovery
 
 1. Solder a 3-pin header on HDR2 and connect a 3.3 V USB-serial adapter: GND to 0V, adapter TX to RX-I, adapter RX to TX-O. Do not connect VCC.
