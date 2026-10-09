@@ -15,6 +15,7 @@ static constexpr uint32_t MIN_SAMPLES_FOR_RATIO = 10;
 static constexpr float FILTER_ALPHA = 0.3f;
 static constexpr float EARLY_STALL_FRACTION = 0.7f;
 static constexpr float TIME_OVERRUN = 1.15f;
+static constexpr float MIN_CURRENT_FRACTION = 0.25f;
 static constexpr uint32_t CAL_PREF_SALT = 0x4F4D4C54;  // "OMLT"
 
 using cover::COVER_CLOSED;
@@ -62,6 +63,7 @@ void OmletDoor::setup() {
       this->close_duration_ = cal.close_ms;
     }
     this->learned_threshold_ = cal.threshold;
+    this->learned_running_ = cal.running;
   }
 
   if (this->crush_pin_ != nullptr) {
@@ -103,6 +105,14 @@ void OmletDoor::loop() {
       if (this->move_op_ == COVER_OPERATION_CLOSING && (this->isr_store_.tripped || this->crush_active_())) {
         ESP_LOGW(TAG, "Crush switch triggered while closing%s", this->isr_store_.tripped ? " (cut by ISR)" : "");
         this->on_obstruction_();
+        break;
+      }
+
+      if (elapsed >= this->start_sensing_delay_ && this->below_ && now - this->below_since_ >= this->stall_time_) {
+        ESP_LOGE(TAG, "Motor current %.3f V below minimum, motor disconnected or faulty", this->filtered_current_);
+        this->stop_move_();
+        this->purpose_ = Purpose::NORMAL;
+        this->enter_fault_("no motor current");
         break;
       }
 
@@ -181,10 +191,12 @@ void OmletDoor::dump_config() {
                 "  Start sensing delay: %" PRIu32 " ms\n"
                 "  Stall time: %" PRIu32 " ms\n"
                 "  Stall threshold: %.3f V (configured), %.3f V (learned), ratio %.2f\n"
+                "  Min current: %.3f V (configured), %.3f V (learned running)\n"
                 "  Max crush retries: %u, retry delay %" PRIu32 " ms",
                 YESNO(this->invert_direction_), this->open_duration_, this->close_duration_, this->max_duration_,
                 this->start_sensing_delay_, this->stall_time_, this->stall_threshold_, this->learned_threshold_,
-                this->stall_ratio_, this->max_crush_retries_, this->crush_retry_delay_);
+                this->stall_ratio_, this->min_current_, this->learned_running_, this->max_crush_retries_,
+                this->crush_retry_delay_);
 }
 
 cover::CoverTraits OmletDoor::get_traits() {
@@ -252,6 +264,7 @@ void OmletDoor::start_move_(cover::CoverOperation op, Purpose purpose) {
   this->running_sum_ = 0.0f;
   this->running_count_ = 0;
   this->above_ = false;
+  this->below_ = false;
   this->isr_store_.tripped = false;
   this->isr_store_.closing = op == COVER_OPERATION_CLOSING;
   this->current_operation = op;
@@ -308,6 +321,15 @@ void OmletDoor::sample_current_() {
   if (millis() - this->move_start_ < this->start_sensing_delay_) {
     return;
   }
+  const float min_current = this->effective_min_current_();
+  if (min_current > 0.0f && this->filtered_current_ < min_current) {
+    if (!this->below_) {
+      this->below_ = true;
+      this->below_since_ = millis();
+    }
+  } else {
+    this->below_ = false;
+  }
   const float threshold = this->effective_threshold_();
   if (threshold > 0.0f && this->filtered_current_ > threshold) {
     if (!this->above_) {
@@ -331,6 +353,17 @@ float OmletDoor::effective_threshold_() const {
   }
   if (this->running_count_ >= MIN_SAMPLES_FOR_RATIO) {
     return (this->running_sum_ / this->running_count_) * this->stall_ratio_;
+  }
+  return 0.0f;
+}
+
+float OmletDoor::effective_min_current_() const {
+  if (this->min_current_ > 0.0f) {
+    return this->min_current_;
+  }
+  const bool calibrating = this->purpose_ == Purpose::CALIBRATE_OPEN || this->purpose_ == Purpose::CALIBRATE_CLOSE;
+  if (!calibrating && this->learned_running_ > 0.0f) {
+    return this->learned_running_ * MIN_CURRENT_FRACTION;
   }
   return 0.0f;
 }
@@ -359,6 +392,7 @@ void OmletDoor::on_end_stop_() {
     case Purpose::CALIBRATE_OPEN:
       this->open_duration_ = elapsed;
       this->learned_threshold_ = 0.5f * (this->cal_close_threshold_ + candidate);
+      this->learned_running_ = mean;
       this->purpose_ = Purpose::NORMAL;
       this->save_calibration_();
       ESP_LOGI(TAG, "Calibration complete: open %" PRIu32 " ms, close %" PRIu32 " ms, threshold %.3f V",
@@ -442,7 +476,7 @@ void OmletDoor::enter_fault_(const char *reason) {
 }
 
 void OmletDoor::save_calibration_() {
-  CalibrationData cal{this->open_duration_, this->close_duration_, this->learned_threshold_};
+  CalibrationData cal{this->open_duration_, this->close_duration_, this->learned_threshold_, this->learned_running_};
   this->cal_pref_.save(&cal);
 }
 

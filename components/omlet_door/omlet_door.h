@@ -32,6 +32,7 @@ struct CalibrationData {
   uint32_t open_ms;
   uint32_t close_ms;
   float threshold;
+  float running;
 } __attribute__((packed));
 
 class OmletDoor : public cover::Cover, public Component {
@@ -57,6 +58,7 @@ class OmletDoor : public cover::Cover, public Component {
   void set_stall_time(uint32_t ms) { this->stall_time_ = ms; }
   void set_stall_threshold(float v) { this->stall_threshold_ = v; }
   void set_stall_ratio(float r) { this->stall_ratio_ = r; }
+  void set_min_current(float v) { this->min_current_ = v; }
   void set_max_crush_retries(uint8_t n) { this->max_crush_retries_ = n; }
   void set_crush_retry_delay(uint32_t ms) { this->crush_retry_delay_ = ms; }
 
@@ -71,6 +73,7 @@ class OmletDoor : public cover::Cover, public Component {
   void apply_drive_(Drive drive);
   void sample_current_();
   float effective_threshold_() const;
+  float effective_min_current_() const;
   bool crush_active_() const;
   void on_end_stop_();
   void on_timeout_();
@@ -97,11 +100,13 @@ class OmletDoor : public cover::Cover, public Component {
   uint32_t stall_time_{100};
   float stall_threshold_{0.0f};
   float stall_ratio_{2.0f};
+  float min_current_{0.0f};
   uint8_t max_crush_retries_{3};
   uint32_t crush_retry_delay_{10000};
 
   ESPPreferenceObject cal_pref_;
   float learned_threshold_{0.0f};
+  float learned_running_{0.0f};
 
   State state_{State::IDLE};
   Purpose purpose_{Purpose::NORMAL};
@@ -127,6 +132,8 @@ class OmletDoor : public cover::Cover, public Component {
   float cal_close_threshold_{0.0f};
   uint32_t above_since_{0};
   bool above_{false};
+  uint32_t below_since_{0};
+  bool below_{false};
 
   HighFrequencyLoopRequester high_freq_;
 };

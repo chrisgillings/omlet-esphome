@@ -26,6 +26,7 @@ CONF_START_SENSING_DELAY = "start_sensing_delay"
 CONF_STALL_TIME = "stall_time"
 CONF_STALL_THRESHOLD = "stall_threshold"
 CONF_STALL_RATIO = "stall_ratio"
+CONF_MIN_CURRENT = "min_current"
 CONF_MAX_CRUSH_RETRIES = "max_crush_retries"
 CONF_CRUSH_RETRY_DELAY = "crush_retry_delay"
 
@@ -106,6 +107,8 @@ async def to_code(config: ConfigType) -> None:
     if (threshold := config.get(CONF_STALL_THRESHOLD)) is not None:
         cg.add(var.set_stall_threshold(threshold))
     cg.add(var.set_stall_ratio(config[CONF_STALL_RATIO]))
+    if (min_current := config.get(CONF_MIN_CURRENT)) is not None:
+        cg.add(var.set_min_current(min_current))
     cg.add(var.set_max_crush_retries(config[CONF_MAX_CRUSH_RETRIES]))
     cg.add(var.set_crush_retry_delay(config[CONF_CRUSH_RETRY_DELAY]))
 
