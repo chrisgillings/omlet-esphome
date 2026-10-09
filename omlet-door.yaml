@@ -13,7 +13,7 @@ esp32:
 
 external_components:
   - source: github://swoboda1337/omlet-esphome
-    components: [omlet_door]
+    components: [omlet_door, lcd_st7032]
 
 logger:
 api:
@@ -83,6 +83,39 @@ button:
     name: Calibrate Door
     on_press:
       - omlet_door.calibrate: coop_door
+
+i2c:
+  sda: GPIO5
+  scl: GPIO4
+  frequency: 100kHz
+
+display:
+  - platform: lcd_st7032
+    id: lcd
+    dimensions: 16x2
+    address: 0x3E
+    # GPIO7 is driven low by the stock firmware to power the display; adjust
+    # "inverted" if yours stays dark.
+    enable_pin:
+      number: GPIO7
+      inverted: true
+    reset_pin: GPIO6
+    backlight_pin: GPIO47
+    contrast: 22
+    update_interval: 1s
+    lambda: |-
+      it.print(0, 0, "Coop Door");
+      if (id(coop_door).current_operation == COVER_OPERATION_OPENING) {
+        it.print(0, 1, "Opening...");
+      } else if (id(coop_door).current_operation == COVER_OPERATION_CLOSING) {
+        it.print(0, 1, "Closing...");
+      } else if (id(coop_door).is_fully_open()) {
+        it.print(0, 1, "Open");
+      } else if (id(coop_door).is_fully_closed()) {
+        it.print(0, 1, "Closed");
+      } else {
+        it.printf(0, 1, "%.0f%%", id(coop_door).position * 100);
+      }
 
 light:
   - platform: binary
