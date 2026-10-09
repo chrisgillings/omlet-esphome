@@ -6,7 +6,12 @@ The stock control panel is an ESP32-S3 that only talks to Omlet's cloud. This pr
 ESPHome so the door works fully locally with Home Assistant. The stock module has no secure boot and no flash
 encryption, so it can be flashed over the serial header and restored from a backup at any time.
 
-Status: hardware mapped from the stock firmware (1.0.55), components written and compiling, not yet bench-tested.
+> **Status: untested, work in progress.**
+> Nothing here has run on a real door yet. The pin map and protocol details were recovered by disassembling the
+> stock firmware (1.0.55), and the ESPHome components and package were mostly generated from that analysis with
+> AI assistance. They compile, but motor direction, crush switch polarity, LCD pin polarities and the ADC scaling
+> are all unverified. Do not flash this onto a door you rely on until it has been bench-tested. Back up your stock
+> firmware first (see below) so you can always go back.
 
 ## Usage
 
