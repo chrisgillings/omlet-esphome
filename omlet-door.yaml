@@ -23,6 +23,11 @@ substitutions:
   # The stock firmware drives GPIO7 low to power the display.
   lcd_enable_inverted: "true"
   lcd_backlight_inverted: "false"
+  # How often to sample the light sensor and battery.
+  sensor_interval: 60s
+  # Battery divider ratio is not known yet; measure once and set it so the
+  # reported value matches the real pack voltage.
+  battery_multiplier: "1.0"
 
 esp32:
   variant: esp32s3
@@ -44,6 +49,15 @@ output:
     id: omlet_coop_light_output
     pin: GPIO8
 
+  # Power gates for the analogue sensors; raised only while sampling.
+  - platform: gpio
+    id: omlet_light_sensor_enable
+    pin: GPIO2
+
+  - platform: gpio
+    id: omlet_battery_enable
+    pin: GPIO46
+
 light:
   - platform: binary
     id: omlet_coop_light
@@ -58,6 +72,39 @@ sensor:
     attenuation: 12db
     update_interval: never
     internal: true
+
+  - platform: adc
+    id: omlet_light_level
+    name: Light Level
+    pin: GPIO1
+    attenuation: 12db
+    update_interval: never
+    unit_of_measurement: V
+    accuracy_decimals: 2
+    icon: mdi:brightness-6
+
+  - platform: adc
+    id: omlet_battery_voltage
+    name: Battery Voltage
+    pin: GPIO3
+    attenuation: 12db
+    update_interval: never
+    unit_of_measurement: V
+    accuracy_decimals: 2
+    device_class: voltage
+    filters:
+      - multiply: ${battery_multiplier}
+
+interval:
+  - interval: ${sensor_interval}
+    then:
+      - output.turn_on: omlet_light_sensor_enable
+      - output.turn_on: omlet_battery_enable
+      - delay: 100ms
+      - component.update: omlet_light_level
+      - component.update: omlet_battery_voltage
+      - output.turn_off: omlet_light_sensor_enable
+      - output.turn_off: omlet_battery_enable
 
 binary_sensor:
   - platform: gpio

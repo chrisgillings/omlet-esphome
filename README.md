@@ -47,6 +47,7 @@ The package provides:
   cut in an interrupt, automatic reopen and retry, brake when parked, and an `omlet_door.calibrate` action.
 - `button` "Calibrate Door" that runs calibration (close to stop, open to stop, learn the thresholds).
 - `light` "Coop Light" on the COOP LIGHT connector.
+- `sensor` for ambient light level and battery voltage, each powered up only while sampling.
 - `binary_sensor` for the crush switch and 12 V mains presence.
 - The three front buttons wired to toggle the door, toggle the light, and stop.
 - `display` on the built-in LCD (`lcd_st7032` platform) showing door state.
