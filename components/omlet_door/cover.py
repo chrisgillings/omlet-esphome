@@ -1,6 +1,6 @@
 from esphome import automation, pins
 import esphome.codegen as cg
-from esphome.components import binary_sensor, cover, voltage_sampler
+from esphome.components import cover, voltage_sampler
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_CLOSE_DURATION,
@@ -20,7 +20,7 @@ CONF_HIGH_SIDE_B = "high_side_b"
 CONF_LOW_SIDE_B = "low_side_b"
 CONF_CURRENT_SAMPLER = "current_sampler"
 CONF_CURRENT_ENABLE_PIN = "current_enable_pin"
-CONF_CRUSH_SWITCH = "crush_switch"
+CONF_CRUSH_PIN = "crush_pin"
 CONF_INVERT_DIRECTION = "invert_direction"
 CONF_START_SENSING_DELAY = "start_sensing_delay"
 CONF_STALL_TIME = "stall_time"
@@ -36,15 +36,15 @@ CONFIG_SCHEMA = (
     cover.cover_schema(OmletDoor, device_class="door")
     .extend(
         {
-            cv.Required(CONF_HIGH_SIDE_A): pins.gpio_output_pin_schema,
-            cv.Required(CONF_LOW_SIDE_A): pins.gpio_output_pin_schema,
-            cv.Required(CONF_HIGH_SIDE_B): pins.gpio_output_pin_schema,
-            cv.Required(CONF_LOW_SIDE_B): pins.gpio_output_pin_schema,
+            cv.Required(CONF_HIGH_SIDE_A): pins.internal_gpio_output_pin_schema,
+            cv.Required(CONF_LOW_SIDE_A): pins.internal_gpio_output_pin_schema,
+            cv.Required(CONF_HIGH_SIDE_B): pins.internal_gpio_output_pin_schema,
+            cv.Required(CONF_LOW_SIDE_B): pins.internal_gpio_output_pin_schema,
             cv.Required(CONF_CURRENT_SAMPLER): cv.use_id(
                 voltage_sampler.VoltageSampler
             ),
             cv.Optional(CONF_CURRENT_ENABLE_PIN): pins.gpio_output_pin_schema,
-            cv.Optional(CONF_CRUSH_SWITCH): cv.use_id(binary_sensor.BinarySensor),
+            cv.Optional(CONF_CRUSH_PIN): pins.internal_gpio_input_pin_schema,
             cv.Optional(CONF_INVERT_DIRECTION, default=False): cv.boolean,
             cv.Optional(CONF_OPEN_DURATION): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_CLOSE_DURATION): cv.positive_time_period_milliseconds,
@@ -91,9 +91,9 @@ async def to_code(config: ConfigType) -> None:
         pin = await cg.gpio_pin_expression(enable_pin)
         cg.add(var.set_current_enable_pin(pin))
 
-    if (crush := config.get(CONF_CRUSH_SWITCH)) is not None:
-        sens = await cg.get_variable(crush)
-        cg.add(var.set_crush_switch(sens))
+    if (crush_pin := config.get(CONF_CRUSH_PIN)) is not None:
+        pin = await cg.gpio_pin_expression(crush_pin)
+        cg.add(var.set_crush_pin(pin))
 
     cg.add(var.set_invert_direction(config[CONF_INVERT_DIRECTION]))
     if (open_duration := config.get(CONF_OPEN_DURATION)) is not None:

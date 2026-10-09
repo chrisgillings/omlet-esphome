@@ -23,6 +23,16 @@ using cover::COVER_OPERATION_CLOSING;
 using cover::COVER_OPERATION_IDLE;
 using cover::COVER_OPERATION_OPENING;
 
+void IRAM_ATTR CrushIsrStore::gpio_intr(CrushIsrStore *arg) {
+  if (!arg->closing || !arg->crush.digital_read())
+    return;
+  arg->high_side_a.digital_write(false);
+  arg->high_side_b.digital_write(false);
+  arg->low_side_a.digital_write(false);
+  arg->low_side_b.digital_write(false);
+  arg->tripped = true;
+}
+
 void OmletDoor::setup() {
   for (auto *pin : {this->high_side_a_, this->low_side_a_, this->high_side_b_, this->low_side_b_}) {
     pin->setup();
@@ -51,9 +61,14 @@ void OmletDoor::setup() {
     this->learned_threshold_ = cal.threshold;
   }
 
-  if (this->crush_switch_ != nullptr) {
-    this->crush_active_ = this->crush_switch_->state;
-    this->crush_switch_->add_on_state_callback([this](bool state) { this->crush_active_ = state; });
+  if (this->crush_pin_ != nullptr) {
+    this->crush_pin_->setup();
+    this->isr_store_.crush = this->crush_pin_->to_isr();
+    this->isr_store_.high_side_a = this->high_side_a_->to_isr();
+    this->isr_store_.low_side_a = this->low_side_a_->to_isr();
+    this->isr_store_.high_side_b = this->high_side_b_->to_isr();
+    this->isr_store_.low_side_b = this->low_side_b_->to_isr();
+    this->crush_pin_->attach_interrupt(&CrushIsrStore::gpio_intr, &this->isr_store_, gpio::INTERRUPT_ANY_EDGE);
   }
 
   this->apply_drive_(Drive::BRAKE);
@@ -79,8 +94,8 @@ void OmletDoor::loop() {
         this->sample_current_();
       }
 
-      if (this->crush_active_ && this->move_op_ == COVER_OPERATION_CLOSING) {
-        ESP_LOGW(TAG, "Crush switch triggered while closing");
+      if (this->move_op_ == COVER_OPERATION_CLOSING && (this->isr_store_.tripped || this->crush_active_())) {
+        ESP_LOGW(TAG, "Crush switch triggered while closing%s", this->isr_store_.tripped ? " (cut by ISR)" : "");
         this->on_obstruction_();
         break;
       }
@@ -127,7 +142,7 @@ void OmletDoor::loop() {
     case State::RETRY_WAIT: {
       if (static_cast<int32_t>(now - this->retry_at_) < 0)
         break;
-      if (this->crush_active_) {
+      if (this->crush_active_()) {
         ESP_LOGW(TAG, "Still crushed, delaying re-close");
         this->retry_at_ = now + this->crush_retry_delay_;
         break;
@@ -149,6 +164,7 @@ void OmletDoor::dump_config() {
   LOG_PIN("  High side B: ", this->high_side_b_);
   LOG_PIN("  Low side B: ", this->low_side_b_);
   LOG_PIN("  Current enable pin: ", this->current_enable_pin_);
+  LOG_PIN("  Crush pin: ", this->crush_pin_);
   ESP_LOGCONFIG(TAG,
                 "  Invert direction: %s\n"
                 "  Open duration: %" PRIu32 " ms\n"
@@ -157,12 +173,10 @@ void OmletDoor::dump_config() {
                 "  Start sensing delay: %" PRIu32 " ms\n"
                 "  Stall time: %" PRIu32 " ms\n"
                 "  Stall threshold: %.3f V (configured), %.3f V (learned), ratio %.2f\n"
-                "  Crush switch: %s\n"
                 "  Max crush retries: %u, retry delay %" PRIu32 " ms",
                 YESNO(this->invert_direction_), this->open_duration_, this->close_duration_, this->max_duration_,
                 this->start_sensing_delay_, this->stall_time_, this->stall_threshold_, this->learned_threshold_,
-                this->stall_ratio_, YESNO(this->crush_switch_ != nullptr), this->max_crush_retries_,
-                this->crush_retry_delay_);
+                this->stall_ratio_, this->max_crush_retries_, this->crush_retry_delay_);
 }
 
 cover::CoverTraits OmletDoor::get_traits() {
@@ -225,6 +239,8 @@ void OmletDoor::start_move_(cover::CoverOperation op, Purpose purpose) {
   this->running_sum_ = 0.0f;
   this->running_count_ = 0;
   this->above_ = false;
+  this->isr_store_.tripped = false;
+  this->isr_store_.closing = op == COVER_OPERATION_CLOSING;
   this->current_operation = op;
   if (this->current_enable_pin_ != nullptr)
     this->current_enable_pin_->digital_write(true);
@@ -235,6 +251,7 @@ void OmletDoor::start_move_(cover::CoverOperation op, Purpose purpose) {
 }
 
 void OmletDoor::stop_move_() {
+  this->isr_store_.closing = false;
   this->set_drive_(Drive::BRAKE);
   this->state_ = State::IDLE;
   this->current_operation = COVER_OPERATION_IDLE;
@@ -292,6 +309,8 @@ float OmletDoor::effective_threshold_() const {
     return (this->running_sum_ / this->running_count_) * this->stall_ratio_;
   return 0.0f;
 }
+
+bool OmletDoor::crush_active_() const { return this->crush_pin_ != nullptr && this->crush_pin_->digital_read(); }
 
 void OmletDoor::on_end_stop_() {
   const uint32_t elapsed = millis() - this->move_start_;

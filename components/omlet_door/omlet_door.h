@@ -1,6 +1,5 @@
 #pragma once
 
-#include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/cover/cover.h"
 #include "esphome/components/voltage_sampler/voltage_sampler.h"
 #include "esphome/core/automation.h"
@@ -17,6 +16,18 @@ enum class State : uint8_t { IDLE, MOVING, RETRY_WAIT, FAULT };
 
 enum class Purpose : uint8_t { NORMAL, CALIBRATE_CLOSE, CALIBRATE_OPEN, CRUSH_REOPEN };
 
+struct CrushIsrStore {
+  static void gpio_intr(CrushIsrStore *arg);
+
+  ISRInternalGPIOPin crush;
+  ISRInternalGPIOPin high_side_a;
+  ISRInternalGPIOPin low_side_a;
+  ISRInternalGPIOPin high_side_b;
+  ISRInternalGPIOPin low_side_b;
+  volatile bool closing{false};
+  volatile bool tripped{false};
+};
+
 struct CalibrationData {
   uint32_t open_ms;
   uint32_t close_ms;
@@ -31,13 +42,13 @@ class OmletDoor : public cover::Cover, public Component {
   float get_setup_priority() const override { return setup_priority::DATA; }
   cover::CoverTraits get_traits() override;
 
-  void set_high_side_a(GPIOPin *pin) { this->high_side_a_ = pin; }
-  void set_low_side_a(GPIOPin *pin) { this->low_side_a_ = pin; }
-  void set_high_side_b(GPIOPin *pin) { this->high_side_b_ = pin; }
-  void set_low_side_b(GPIOPin *pin) { this->low_side_b_ = pin; }
+  void set_high_side_a(InternalGPIOPin *pin) { this->high_side_a_ = pin; }
+  void set_low_side_a(InternalGPIOPin *pin) { this->low_side_a_ = pin; }
+  void set_high_side_b(InternalGPIOPin *pin) { this->high_side_b_ = pin; }
+  void set_low_side_b(InternalGPIOPin *pin) { this->low_side_b_ = pin; }
   void set_current_sampler(voltage_sampler::VoltageSampler *sampler) { this->current_sampler_ = sampler; }
   void set_current_enable_pin(GPIOPin *pin) { this->current_enable_pin_ = pin; }
-  void set_crush_switch(binary_sensor::BinarySensor *sens) { this->crush_switch_ = sens; }
+  void set_crush_pin(InternalGPIOPin *pin) { this->crush_pin_ = pin; }
   void set_invert_direction(bool invert) { this->invert_direction_ = invert; }
   void set_open_duration(uint32_t ms) { this->open_duration_ = ms; }
   void set_close_duration(uint32_t ms) { this->close_duration_ = ms; }
@@ -60,6 +71,7 @@ class OmletDoor : public cover::Cover, public Component {
   void apply_drive_(Drive drive);
   void sample_current_();
   float effective_threshold_() const;
+  bool crush_active_() const;
   void on_end_stop_();
   void on_timeout_();
   void on_obstruction_();
@@ -68,13 +80,14 @@ class OmletDoor : public cover::Cover, public Component {
   void enter_fault_(const char *reason);
   void save_calibration_();
 
-  GPIOPin *high_side_a_{nullptr};
-  GPIOPin *low_side_a_{nullptr};
-  GPIOPin *high_side_b_{nullptr};
-  GPIOPin *low_side_b_{nullptr};
+  InternalGPIOPin *high_side_a_{nullptr};
+  InternalGPIOPin *low_side_a_{nullptr};
+  InternalGPIOPin *high_side_b_{nullptr};
+  InternalGPIOPin *low_side_b_{nullptr};
   voltage_sampler::VoltageSampler *current_sampler_{nullptr};
   GPIOPin *current_enable_pin_{nullptr};
-  binary_sensor::BinarySensor *crush_switch_{nullptr};
+  InternalGPIOPin *crush_pin_{nullptr};
+  CrushIsrStore isr_store_;
 
   bool invert_direction_{false};
   uint32_t open_duration_{0};
@@ -94,7 +107,6 @@ class OmletDoor : public cover::Cover, public Component {
   Purpose purpose_{Purpose::NORMAL};
   cover::CoverOperation move_op_{cover::COVER_OPERATION_IDLE};
   float target_position_{0.0f};
-  bool crush_active_{false};
   uint8_t crush_count_{0};
 
   Drive pending_drive_{Drive::OFF};

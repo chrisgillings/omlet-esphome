@@ -34,13 +34,14 @@ sensor:
     internal: true
 
 binary_sensor:
+  # Optional: expose the crush switch to Home Assistant as well. The cover owns the
+  # interrupt on this pin, so both uses must set allow_other_uses.
   - platform: gpio
-    id: crush_switch
     name: Crush Switch
     pin:
       number: GPIO40
       mode: input
-      # invert here if the switch reads active-low on your board
+      allow_other_uses: true
     device_class: problem
 
   - platform: gpio
@@ -60,7 +61,13 @@ cover:
     low_side_b: GPIO14
     current_sampler: motor_current
     current_enable_pin: GPIO45
-    crush_switch: crush_switch
+    # Crush switch on the yellow pair of the DOOR connector. The ISR cuts the motor
+    # the moment it closes while the door is closing. Add "inverted: true" if the
+    # switch reads active-low on your board.
+    crush_pin:
+      number: GPIO40
+      mode: input
+      allow_other_uses: true
     # Set to true if "open" drives the door the wrong way.
     invert_direction: false
     max_duration: 30s
