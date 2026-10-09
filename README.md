@@ -1,0 +1,110 @@
+# omlet-esphome
+
+ESPHome firmware for the **Omlet Smart Automatic Chicken Coop Door** (WiFi control panel, board `X107 ADO ISSB3`).
+
+The stock control panel is an ESP32-S3 that only talks to Omlet's cloud. This project replaces the firmware with
+ESPHome so the door works fully locally with Home Assistant. The stock module has no secure boot and no flash
+encryption, so it can be flashed over the serial header and restored from a backup at any time.
+
+Status: hardware fully mapped from the stock firmware (1.0.55), ESPHome config not written yet.
+
+## Hardware
+
+- ESP32-S3-WROOM-1 N16R8 (16 MB flash, 8 MB PSRAM), 40 MHz crystal, 32.768 kHz crystal on GPIO15/16
+- Power: 12 V barrel jack or 4×AA backup, two buck regulators
+- Serial header `HDR2` (through-hole, next to the module): `0V / RX-I / TX-O`, 115200 8N1, 3.3 V logic
+- Download mode: hold the back-side **RESET** button (GPIO0) while applying power
+- I2C character LCD (chip-on-glass, ST7032-class) 2×16 at address 0x3E
+- Discrete H-bridge for the door motor built from two dual-MOSFET SOIC-8s with low-side shunts for current sensing
+- 4-pin Molex "DOOR" (same as a 4-pin ATX plug): black pair = motor, yellow pair = crush switch
+- 2-pin Molex "COOP LIGHT" for the Omlet coop light accessory
+- 5-pin "I2C COMS" header: `V+ / NT / SCL / SDA / 0V` (shares the LCD I2C bus)
+- 2-pin "Prod Test" header
+
+## Pin map
+
+Recovered from the stock firmware's pin table and its call sites.
+
+| GPIO | Function | Notes |
+|------|----------|-------|
+| 0  | RESET button (SW4) | Also the boot strap; hold at power-up for download mode |
+| 1  | ADC1_CH0 ambient light sensor | Enabled by GPIO2; stock firmware reads it from the ULP during deep sleep |
+| 2  | Light sensor enable | High only while sampling |
+| 3  | ADC1_CH2 battery voltage | Divider enabled by GPIO46 |
+| 4  | I2C SCL | LCD and the I2C COMS header |
+| 5  | I2C SDA | |
+| 6  | LCD reset | Active low, pulsed at init |
+| 7  | LCD power enable | Driven low at init, high to switch the display off (probably P-FET) |
+| 8  | Coop light output | Plain push-pull GPIO |
+| 9  | ADC1_CH8 motor current | Shunt amplifier, enabled by GPIO45 |
+| 10 | ADC1_CH9 | Fifth analogue input, no enable pin; probably coop light current |
+| 11 | H-bridge high-side B | Motor |
+| 12 | H-bridge low-side A | Motor |
+| 13 | H-bridge high-side A | Motor |
+| 14 | H-bridge low-side B | Motor |
+| 15 / 16 | 32.768 kHz crystal | |
+| 17 | Button | Front panel |
+| 18 | Button | Front panel |
+| 21 | Button | Front panel |
+| 40 | Crush switch input | Yellow pair on the DOOR connector, interrupt driven |
+| 42 | Prod Test header input | Low enters production test mode in stock firmware |
+| 43 / 44 | UART0 TX / RX | Serial header HDR2 |
+| 45 | Motor current amplifier enable | |
+| 46 | Battery divider enable | |
+| 47 | LCD backlight | Polarity to confirm |
+| 48 | 12 V adapter present | Input, high when mains adapter is connected |
+
+## Motor control
+
+Only two of the four bridge pins are ever high at once:
+
+| State | Pins high |
+|-------|-----------|
+| Forward | GPIO13 + GPIO14 |
+| Reverse | GPIO11 + GPIO12 |
+| Stop (brake) | GPIO12 + GPIO14 |
+
+Stop shorts the motor through both low-side FETs and is held while parked. The stock firmware drives all four pins
+low before raising the new pair. For the standard sliding door the pins are plain full-on GPIO outputs; the rotary
+door variant uses 5 kHz PWM at 50 % forward and 70 % reverse.
+
+Position is time-of-flight: calibration runs the door to each end stop using the current sense, records the travel
+time, and compensates it with the measured battery voltage. Crush detection uses the switch on GPIO40, with the
+motor current as a backstop.
+
+## LCD
+
+ST7032-class controller at I2C 0x3E, 100 kHz, two lines of sixteen characters. Each write is a control byte
+followed by payload: `0x00` commands, `0x40` data, `0x80` single command.
+
+Init after the reset pulse on GPIO6:
+
+```
+0x38 0x39 0x13 0x76 0x55 0x68 0x38 0x0C 0x01 0x06
+```
+
+Cursor is `0x80 | col` for line 1 and `0xC0 | col` for line 2. Custom glyphs are loaded through CGRAM
+(`0x40 | (index << 3)` then eight rows).
+
+## Flashing and recovery
+
+1. Solder a 3-pin header on HDR2 and connect a 3.3 V USB-serial adapter: GND to 0V, adapter TX to RX-I, adapter RX to TX-O. Do not connect VCC.
+2. Hold RESET, apply power, release.
+3. Back up the stock flash before anything else:
+   ```
+   esptool --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 read-flash 0 0x1000000 omlet-stock-backup.bin
+   ```
+   Keep this file private. It contains your Wi-Fi credentials and the device's Omlet API token.
+4. Flash ESPHome as usual. To go back to stock, write the backup to offset 0 with `write-flash`.
+
+## Partition layout of the stock firmware
+
+| Name | Type | Offset | Size |
+|------|------|--------|------|
+| nvs | data | 0x9000 | 16 KiB |
+| otadata | data | 0xD000 | 8 KiB |
+| phy_init | data | 0xF000 | 4 KiB |
+| factory_test | app | 0x10000 | 4032 KiB |
+| ota_0 | app | 0x400000 | 5 MiB |
+| ota_1 | app | 0x900000 | 5 MiB |
+| littlefs | data | 0xE00000 | 2 MiB |
