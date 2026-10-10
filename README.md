@@ -73,7 +73,7 @@ Recovered from the stock firmware's pin table and its call sites.
 |------|----------|-------|
 | 0  | RESET button (SW4) | Also the boot strap; hold at power-up for download mode |
 | 1  | ADC1_CH0 ambient light sensor | Enabled by GPIO2; stock firmware reads it from the ULP during deep sleep |
-| 2  | Light sensor enable | High only while sampling |
+| 2  | Light sensor enable | Active low; pulled low only while sampling |
 | 3  | ADC1_CH2 battery voltage | Divider enabled by GPIO46 |
 | 4  | I2C SCL | LCD and the I2C COMS header |
 | 5  | I2C SDA | |
@@ -93,8 +93,8 @@ Recovered from the stock firmware's pin table and its call sites.
 | 40 | Crush switch input | Yellow pair on the DOOR connector, interrupt driven |
 | 42 | Prod Test header input | Low enters production test mode in stock firmware |
 | 43 / 44 | UART0 TX / RX | Serial header HDR2 |
-| 45 | Motor current amplifier enable | |
-| 46 | Battery divider enable | |
+| 45 | Motor current amplifier enable | Active high |
+| 46 | Battery divider enable | Active high |
 | 47 | LCD backlight | Polarity to confirm |
 | 48 | 12 V adapter present | Input, high when mains adapter is connected |
 
@@ -111,6 +111,11 @@ Only two of the four bridge pins are ever high at once:
 Stop shorts the motor through both low-side FETs and is held while parked. The stock firmware drives all four pins
 low before raising the new pair. For the standard sliding door the pins are plain full-on GPIO outputs; the rotary
 door variant uses 5 kHz PWM at 50 % forward and 70 % reverse.
+
+On batteries the stock firmware runs a small ULP-RISC-V program while the main core sleeps: it polls the three
+buttons every few milliseconds and samples the light sensor about once a second, waking the main core on a button
+change or when the averaged light level crosses the open or close threshold for about twenty seconds. ESPHome has
+no ULP support yet, so battery mode here will use timer wake instead.
 
 Position is time-of-flight: calibration runs the door to each end stop using the current sense, records the travel
 time, and compensates it with the measured battery voltage. Crush detection uses the switch on GPIO40, with the

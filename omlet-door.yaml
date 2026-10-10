@@ -52,7 +52,9 @@ output:
   # Power gates for the analogue sensors; raised only while sampling.
   - platform: gpio
     id: omlet_light_sensor_enable
-    pin: GPIO2
+    pin:
+      number: GPIO2
+      inverted: true
 
   - platform: gpio
     id: omlet_battery_enable
