@@ -469,6 +469,7 @@ bool OmletDoor::update_position_(uint32_t now) {
 
 void OmletDoor::enter_fault_(const char *reason) {
   ESP_LOGE(TAG, "Fault: %s", reason);
+  this->fault_reason_ = reason;
   this->state_ = State::FAULT;
   this->purpose_ = Purpose::NORMAL;
   this->current_operation = COVER_OPERATION_IDLE;

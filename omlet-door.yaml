@@ -117,6 +117,12 @@ binary_sensor:
       allow_other_uses: true
     device_class: problem
 
+  - platform: template
+    id: omlet_door_fault
+    name: Door Fault
+    device_class: problem
+    lambda: return id(omlet_coop_door).has_fault();
+
   - platform: gpio
     id: omlet_mains_power
     name: Mains Power
@@ -211,7 +217,9 @@ display:
     update_interval: 1s
     lambda: |-
       it.print(0, 0, "Coop Door");
-      if (id(omlet_coop_door).current_operation == COVER_OPERATION_OPENING) {
+      if (id(omlet_coop_door).has_fault()) {
+        it.print(0, 1, "FAULT");
+      } else if (id(omlet_coop_door).current_operation == COVER_OPERATION_OPENING) {
         it.print(0, 1, "Opening...");
       } else if (id(omlet_coop_door).current_operation == COVER_OPERATION_CLOSING) {
         it.print(0, 1, "Closing...");

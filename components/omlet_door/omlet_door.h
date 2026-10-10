@@ -63,6 +63,8 @@ class OmletDoor : public cover::Cover, public Component {
   void set_crush_retry_delay(uint32_t ms) { this->crush_retry_delay_ = ms; }
 
   void calibrate();
+  bool has_fault() const { return this->state_ == State::FAULT; }
+  const char *get_fault_reason() const { return this->has_fault() ? this->fault_reason_ : ""; }
 
  protected:
   void control(const cover::CoverCall &call) override;
@@ -130,6 +132,7 @@ class OmletDoor : public cover::Cover, public Component {
   uint32_t running_count_{0};
   float stall_level_{0.0f};
   float cal_close_threshold_{0.0f};
+  const char *fault_reason_{""};
   uint32_t above_since_{0};
   bool above_{false};
   uint32_t below_since_{0};
