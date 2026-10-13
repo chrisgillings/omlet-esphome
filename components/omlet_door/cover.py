@@ -122,5 +122,6 @@ async def to_code(config: ConfigType) -> None:
 async def calibrate_action_to_code(
     config: ConfigType, action_id: cg.ID, template_arg: cg.TemplateArguments, args
 ) -> cg.MockObj:
-    parent = await cg.get_variable(config[CONF_ID])
-    return cg.new_Pvariable(action_id, template_arg, parent)
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    return var

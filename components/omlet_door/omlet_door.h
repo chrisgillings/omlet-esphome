@@ -147,13 +147,9 @@ class OmletDoor : public cover::Cover, public Component {
   HighFrequencyLoopRequester high_freq_;
 };
 
-template<typename... Ts> class CalibrateAction : public Action<Ts...> {
+template<typename... Ts> class CalibrateAction final : public Action<Ts...>, public Parented<OmletDoor> {
  public:
-  explicit CalibrateAction(OmletDoor *parent) : parent_(parent) {}
   void play(const Ts &...x) override { this->parent_->calibrate(); }
-
- protected:
-  OmletDoor *parent_;
 };
 
 }  // namespace esphome::omlet_door
