@@ -11,8 +11,9 @@ substitutions:
   door_name: Door
   # Set to "true" if "open" drives the door the wrong way.
   invert_direction: "false"
-  # Set to "true" if the crush switch reads active-low on your board.
-  crush_inverted: "false"
+  # The stock firmware reads the crush switch active-low (external pull-up); set
+  # to "false" if your board reads it the other way.
+  crush_inverted: "true"
   max_duration: 30s
   start_sensing_delay: 300ms
   stall_time: 100ms

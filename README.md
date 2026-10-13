@@ -44,8 +44,9 @@ substitutions at the top of the package; set them in your own `substitutions:` b
 The package provides:
 
 - `cover` for the door (`omlet_door` platform): time-of-flight position, current-sensed end stops, crush switch
-  cut in an interrupt, automatic reopen and retry, brake when parked, and an `omlet_door.calibrate` action.
-- `button` "Calibrate Door" that runs calibration (close to stop, open to stop, learn the thresholds).
+  cut in an interrupt, automatic reverse and retry on obstruction, gearbox relief after each end stop, brake when
+  parked, and an `omlet_door.calibrate` action.
+- `button` "Calibrate Door" that runs calibration (open to stop, close to stop, open to stop, learn the thresholds).
 - `light` "Coop Light" on the COOP LIGHT connector.
 - `sensor` for ambient light level and battery voltage, each powered up only while sampling.
 - `binary_sensor` for the crush switch and 12 V mains presence.
@@ -118,8 +119,13 @@ change or when the averaged light level crosses the open or close threshold for 
 no ULP support yet, so battery mode here will use timer wake instead.
 
 Position is time-of-flight: calibration runs the door to each end stop using the current sense, records the travel
-time, and compensates it with the measured battery voltage. Crush detection uses the switch on GPIO40, with the
-motor current as a backstop.
+time, and compensates it with the measured battery voltage. The crush switch on GPIO40 (active low, external
+pull-up) is never used as an end stop: any press while closing, including after the motor has stopped at the
+bottom, reverses the door. The closed end is detected by current only, and a stall is treated as the end stop once
+about 90 % of the calibrated travel time has passed, or within the first half second (door already at the end);
+anything in between is an obstruction and the door reverses and retries. After reaching an end stop the stock
+firmware waits a second and drives the motor the other way for 100 ms to unload the gearbox. The `omlet_door`
+component mirrors all of this.
 
 ## LCD
 

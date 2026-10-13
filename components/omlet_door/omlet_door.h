@@ -14,7 +14,7 @@ enum class Drive : uint8_t { OFF, FORWARD, REVERSE, BRAKE };
 
 enum class State : uint8_t { IDLE, MOVING, RETRY_WAIT, FAULT };
 
-enum class Purpose : uint8_t { NORMAL, CALIBRATE_CLOSE, CALIBRATE_OPEN, CRUSH_REOPEN };
+enum class Purpose : uint8_t { NORMAL, CALIBRATE_PRE_OPEN, CALIBRATE_CLOSE, CALIBRATE_OPEN, OBSTRUCTION_RETURN };
 
 struct CrushIsrStore {
   static void gpio_intr(CrushIsrStore *arg);
@@ -77,10 +77,13 @@ class OmletDoor : public cover::Cover, public Component {
   float effective_threshold_() const;
   float effective_min_current_() const;
   bool crush_active_() const;
+  bool is_calibrating_() const;
+  uint32_t start_window_() const;
   void on_end_stop_();
   void on_timeout_();
   void on_obstruction_();
-  void finish_calibration_step_();
+  void start_relief_();
+  void cancel_relief_();
   bool update_position_(uint32_t now);
   void enter_fault_(const char *reason);
   void save_calibration_();
@@ -113,10 +116,12 @@ class OmletDoor : public cover::Cover, public Component {
   State state_{State::IDLE};
   Purpose purpose_{Purpose::NORMAL};
   cover::CoverOperation move_op_{cover::COVER_OPERATION_IDLE};
+  cover::CoverOperation retry_op_{cover::COVER_OPERATION_IDLE};
   float target_position_{0.0f};
   uint8_t crush_count_{0};
 
   Drive pending_drive_{Drive::OFF};
+  Drive relief_drive_{Drive::OFF};
   bool drive_pending_{false};
   uint32_t drive_pending_since_{0};
 
