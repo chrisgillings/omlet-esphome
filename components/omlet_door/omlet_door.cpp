@@ -56,8 +56,8 @@ void OmletDoor::setup() {
     this->position = COVER_CLOSED;
   }
 
-  this->cal_pref_ =
-      global_preferences->make_preference<CalibrationData>(this->get_object_id_hash() ^ CAL_PREF_SALT, true);
+  const uint32_t key = this->get_object_id_hash() ^ CAL_PREF_SALT;
+  this->cal_pref_ = global_preferences->make_preference<CalibrationData>(key, true);
   CalibrationData cal{};
   if (this->cal_pref_.load(&cal)) {
     if (this->open_duration_ == 0) {
@@ -123,10 +123,9 @@ void OmletDoor::loop() {
       if (elapsed >= this->start_sensing_delay_ && this->above_ && now - this->above_since_ >= this->stall_time_) {
         this->stall_level_ = this->filtered_current_;
         const bool closing = this->move_op_ == COVER_OPERATION_CLOSING;
-        const uint32_t duration = closing ? this->close_duration_ : this->open_duration_;
+        const uint32_t duration = this->move_duration_();
         const bool at_start = elapsed < this->start_window_();
-        const bool early =
-            !at_start && this->purpose_ == Purpose::NORMAL && duration > 0 && elapsed < duration * EARLY_STALL_FRACTION;
+        const bool early = !at_start && this->purpose_ == Purpose::NORMAL && elapsed < duration * EARLY_STALL_FRACTION;
         if (early) {
           ESP_LOGW(TAG, "High current %.3f V at %" PRIu32 " ms while %s, treating as obstruction",
                    this->filtered_current_, elapsed, closing ? "closing" : "opening");
@@ -143,8 +142,7 @@ void OmletDoor::loop() {
         break;
       }
 
-      const uint32_t duration =
-          this->move_op_ == COVER_OPERATION_OPENING ? this->open_duration_ : this->close_duration_;
+      const uint32_t duration = this->move_duration_();
       if (this->purpose_ != Purpose::CALIBRATE_OPEN && this->purpose_ != Purpose::CALIBRATE_CLOSE && duration > 0 &&
           elapsed >= static_cast<uint32_t>(duration * TIME_OVERRUN)) {
         ESP_LOGD(TAG, "No stall seen, assuming end stop by time at %" PRIu32 " ms", elapsed);
@@ -385,6 +383,10 @@ bool OmletDoor::is_calibrating_() const {
          this->purpose_ == Purpose::CALIBRATE_OPEN;
 }
 
+uint32_t OmletDoor::move_duration_() const {
+  return this->move_op_ == COVER_OPERATION_OPENING ? this->open_duration_ : this->close_duration_;
+}
+
 uint32_t OmletDoor::start_window_() const {
   return std::max(START_WINDOW_MS, this->start_sensing_delay_ + this->stall_time_ + 100);
 }
@@ -499,7 +501,7 @@ void OmletDoor::on_obstruction_() {
 }
 
 bool OmletDoor::update_position_(uint32_t now) {
-  const uint32_t duration = this->move_op_ == COVER_OPERATION_OPENING ? this->open_duration_ : this->close_duration_;
+  const uint32_t duration = this->move_duration_();
   const uint32_t dt = now - this->last_position_update_;
   this->last_position_update_ = now;
   if (duration == 0) {

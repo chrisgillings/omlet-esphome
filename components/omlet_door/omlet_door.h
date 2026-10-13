@@ -78,6 +78,7 @@ class OmletDoor : public cover::Cover, public Component {
   float effective_min_current_() const;
   bool crush_active_() const;
   bool is_calibrating_() const;
+  uint32_t move_duration_() const;
   uint32_t start_window_() const;
   void on_end_stop_();
   void on_timeout_();
