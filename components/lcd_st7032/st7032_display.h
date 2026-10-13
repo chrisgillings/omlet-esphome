@@ -24,7 +24,6 @@ class ST7032LCDDisplay final : public lcd_base::LCDDisplay, public i2c::I2CDevic
   void dump_config() override;
   void backlight();
   void no_backlight();
-  /// Change the contrast at runtime, 0 to 63.
   void set_contrast_live(uint8_t contrast);
 
  protected:

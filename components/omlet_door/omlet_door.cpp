@@ -125,8 +125,8 @@ void OmletDoor::loop() {
         const bool closing = this->move_op_ == COVER_OPERATION_CLOSING;
         const uint32_t duration = closing ? this->close_duration_ : this->open_duration_;
         const bool at_start = elapsed < this->start_window_();
-        const bool early = !at_start && this->purpose_ == Purpose::NORMAL && duration > 0 &&
-                           elapsed < duration * EARLY_STALL_FRACTION;
+        const bool early =
+            !at_start && this->purpose_ == Purpose::NORMAL && duration > 0 && elapsed < duration * EARLY_STALL_FRACTION;
         if (early) {
           ESP_LOGW(TAG, "High current %.3f V at %" PRIu32 " ms while %s, treating as obstruction",
                    this->filtered_current_, elapsed, closing ? "closing" : "opening");
