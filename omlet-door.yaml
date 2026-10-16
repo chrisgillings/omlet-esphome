@@ -106,7 +106,6 @@ interval:
     then:
       - output.turn_on: omlet_light_sensor_enable
       - output.turn_on: omlet_battery_enable
-      # The stock firmware lets the battery divider settle for a second.
       - delay: 1s
       - component.update: omlet_light_level
       - component.update: omlet_battery_voltage
