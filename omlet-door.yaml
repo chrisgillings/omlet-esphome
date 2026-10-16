@@ -85,8 +85,6 @@ sensor:
     update_interval: never
     internal: true
 
-  # Scaled the way the stock firmware does: 12-bit counts / 4 minus a dark
-  # offset, with the slope halved above 50, so 100 % is reached at about 0.46 V.
   - platform: adc
     id: omlet_light_level
     name: Light Level
@@ -98,6 +96,8 @@ sensor:
     icon: mdi:brightness-6
     filters:
       - lambda: |-
+          // Same scale as the stock firmware: 12-bit counts / 4 minus a dark
+          // offset, slope halved above 50, so 100 % is reached at about 0.46 V.
           float level = x * 4095.0f / 3.1f / 4.0f - 3.0f;
           if (level > 50.0f) {
             level = 50.0f + (level - 50.0f) / 2.0f;
