@@ -358,7 +358,7 @@ lcd_menu:
   display_id: omlet_lcd
   active: false
   mode: rotary
-  mark_submenu: 0x3E
+  mark_submenu: 0x20
   mark_back: 0x3C
   items:
     - type: label
