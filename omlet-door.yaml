@@ -263,8 +263,6 @@ cover:
   - platform: omlet_door
     id: omlet_coop_door
     name: ${door_name}
-    # Stock firmware: open = GPIO11 + GPIO12, close = GPIO13 + GPIO14,
-    # brake = GPIO12 + GPIO14 (the two low sides).
     high_side_a: GPIO11
     low_side_a: GPIO14
     high_side_b: GPIO13
@@ -360,6 +358,8 @@ lcd_menu:
   display_id: omlet_lcd
   active: false
   mode: rotary
+  mark_submenu: 0x3E
+  mark_back: 0x3C
   items:
     - type: label
       text: !lambda |-
@@ -387,5 +387,7 @@ lcd_menu:
             - omlet_door.calibrate: omlet_coop_door
         - type: back
           text: Back
-    - type: back
+    - type: command
       text: Exit
+      on_value:
+        - display_menu.hide: omlet_menu
