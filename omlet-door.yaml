@@ -39,7 +39,7 @@ esp32:
 external_components:
   - source: github://swoboda1337/omlet-esphome
     components: [omlet_door, lcd_st7032]
-    refresh: 0s
+    refresh: 1h
 
 i2c:
   sda: GPIO5
