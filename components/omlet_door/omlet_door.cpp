@@ -15,6 +15,7 @@ static constexpr uint32_t CALIBRATION_PAUSE_MS = 1000;
 static constexpr uint32_t START_WINDOW_MS = 600;
 static constexpr uint32_t RELIEF_DELAY_MS = 1000;
 static constexpr uint32_t RELIEF_PULSE_MS = 100;
+static constexpr uint32_t CRUSH_REVERSE_DELAY_MS = 1000;
 static constexpr uint32_t MIN_SAMPLES_FOR_RATIO = 10;
 static constexpr float FILTER_ALPHA = 0.3f;
 static constexpr float EARLY_STALL_FRACTION = 0.9f;
@@ -162,6 +163,16 @@ void OmletDoor::loop() {
                  this->effective_threshold_(), this->effective_min_current_(), YESNO(this->crush_active_()));
         this->publish_state(false);
       }
+      break;
+    }
+
+    case State::REVERSE_WAIT: {
+      if (static_cast<int32_t>(now - this->reverse_at_) < 0) {
+        break;
+      }
+      const bool closing = this->retry_op_ == COVER_OPERATION_CLOSING;
+      ESP_LOGI(TAG, "Reversing after obstruction while %s", closing ? "closing" : "opening");
+      this->start_move_(closing ? COVER_OPERATION_OPENING : COVER_OPERATION_CLOSING, Purpose::OBSTRUCTION_RETURN);
       break;
     }
 
@@ -498,9 +509,12 @@ void OmletDoor::on_obstruction_() {
   const bool closing = this->move_op_ == COVER_OPERATION_CLOSING;
   this->retry_op_ = this->move_op_;
   this->stop_move_();
-  ESP_LOGW(TAG, "Obstruction while %s (%u of %u), reversing", closing ? "closing" : "opening", this->crush_count_,
-           this->max_crush_retries_);
-  this->start_move_(closing ? COVER_OPERATION_OPENING : COVER_OPERATION_CLOSING, Purpose::OBSTRUCTION_RETURN);
+  ESP_LOGW(TAG, "Obstruction while %s (%u of %u), braking then reversing", closing ? "closing" : "opening",
+           this->crush_count_, this->max_crush_retries_);
+  this->purpose_ = Purpose::OBSTRUCTION_RETURN;
+  this->state_ = State::REVERSE_WAIT;
+  this->reverse_at_ = millis() + CRUSH_REVERSE_DELAY_MS;
+  this->publish_state();
 }
 
 bool OmletDoor::update_position_(uint32_t now) {

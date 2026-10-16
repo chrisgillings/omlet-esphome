@@ -12,7 +12,7 @@ namespace esphome::omlet_door {
 
 enum class Drive : uint8_t { OFF, FORWARD, REVERSE, BRAKE };
 
-enum class State : uint8_t { IDLE, MOVING, RETRY_WAIT, FAULT };
+enum class State : uint8_t { IDLE, MOVING, REVERSE_WAIT, RETRY_WAIT, FAULT };
 
 enum class Purpose : uint8_t { NORMAL, CALIBRATE_PRE_OPEN, CALIBRATE_CLOSE, CALIBRATE_OPEN, OBSTRUCTION_RETURN };
 
@@ -131,6 +131,7 @@ class OmletDoor : public cover::Cover, public Component {
   uint32_t last_position_update_{0};
   uint32_t last_publish_{0};
   uint32_t retry_at_{0};
+  uint32_t reverse_at_{0};
 
   float filtered_current_{0.0f};
   bool filter_primed_{false};

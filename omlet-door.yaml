@@ -41,6 +41,8 @@ external_components:
     components: [omlet_door, lcd_st7032]
     refresh: 1h
 
+debug:
+
 i2c:
   sda: GPIO5
   scl: GPIO4
@@ -104,7 +106,8 @@ interval:
     then:
       - output.turn_on: omlet_light_sensor_enable
       - output.turn_on: omlet_battery_enable
-      - delay: 100ms
+      # The stock firmware lets the battery divider settle for a second.
+      - delay: 1s
       - component.update: omlet_light_level
       - component.update: omlet_battery_voltage
       - output.turn_off: omlet_light_sensor_enable
@@ -198,6 +201,12 @@ cover:
     stall_ratio: ${stall_ratio}
     max_crush_retries: ${max_crush_retries}
     crush_retry_delay: ${crush_retry_delay}
+
+text_sensor:
+  - platform: debug
+    reset_reason:
+      name: Reset Reason
+      entity_category: diagnostic
 
 button:
   - platform: template
