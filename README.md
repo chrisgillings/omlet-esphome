@@ -58,6 +58,20 @@ The package provides:
   calibrate command; up and down scroll, OK selects, holding OK or thirty seconds of silence leaves it.
 - `display` on the built-in LCD (`lcd_st7032` platform) showing door state and what the buttons do.
 
+## Flashing and recovery
+
+1. Connect a 3.3 V USB-serial adapter to HDR2: GND to 0V, adapter TX to RX-I, adapter RX to TX-O. Do not connect
+   VCC. Soldering a 3-pin header is the tidy way, but for a one-off flash you can just push three header pins (or
+   the stripped ends of the jumper wires) into the holes and lean them to one side so they press against the
+   plating; that is enough contact for the few seconds it takes.
+2. Hold RESET, press RESTART (or apply power), release RESET.
+3. Back up the stock flash before anything else:
+   ```
+   esptool --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 read-flash 0 0x1000000 omlet-stock-backup.bin
+   ```
+   Keep this file private. It contains your Wi-Fi credentials and the device's Omlet API token.
+4. Flash ESPHome as usual. To go back to stock, write the backup to offset 0 with `write-flash`.
+
 ## Hardware
 
 - ESP32-S3-WROOM-1 N16R8 (16 MB flash, 8 MB PSRAM), 40 MHz crystal, 32.768 kHz crystal on GPIO15/16
@@ -151,20 +165,6 @@ Cursor is `0x80 | col` for line 1 and `0xC0 | col` for line 2. Custom glyphs are
 - Battery operation with deep sleep: decide at boot from the mains-detect pin, timer wake every ten minutes plus
   button wake on GPIO21/17/18, never sleep while the door is moving, compute sleep length from the next scheduled
   open or close, sample the light sensor on each wake.
-
-## Flashing and recovery
-
-1. Connect a 3.3 V USB-serial adapter to HDR2: GND to 0V, adapter TX to RX-I, adapter RX to TX-O. Do not connect
-   VCC. Soldering a 3-pin header is the tidy way, but for a one-off flash you can just push three header pins (or
-   the stripped ends of the jumper wires) into the holes and lean them to one side so they press against the
-   plating; that is enough contact for the few seconds it takes.
-2. Hold RESET, press RESTART (or apply power), release RESET.
-3. Back up the stock flash before anything else:
-   ```
-   esptool --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 read-flash 0 0x1000000 omlet-stock-backup.bin
-   ```
-   Keep this file private. It contains your Wi-Fi credentials and the device's Omlet API token.
-4. Flash ESPHome as usual. To go back to stock, write the backup to offset 0 with `write-flash`.
 
 ## Partition layout of the stock firmware
 
