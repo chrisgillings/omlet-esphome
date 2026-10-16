@@ -124,9 +124,9 @@ void OmletDoor::loop() {
       if (elapsed >= this->start_sensing_delay_ && this->above_ && now - this->above_since_ >= this->stall_time_) {
         this->stall_level_ = this->filtered_current_;
         const bool closing = this->move_op_ == COVER_OPERATION_CLOSING;
-        const uint32_t duration = this->move_duration_();
         const bool at_start = elapsed < this->start_window_();
-        const bool early = !at_start && this->purpose_ == Purpose::NORMAL && elapsed < duration * EARLY_STALL_FRACTION;
+        const bool early = !at_start && this->purpose_ == Purpose::NORMAL &&
+                           elapsed < this->move_expected_ms_ * EARLY_STALL_FRACTION;
         if (early) {
           ESP_LOGW(TAG, "High current %.3f V at %" PRIu32 " ms while %s, treating as obstruction",
                    this->filtered_current_, elapsed, closing ? "closing" : "opening");
@@ -279,6 +279,8 @@ void OmletDoor::start_move_(cover::CoverOperation op, Purpose purpose) {
   this->move_op_ = op;
   this->purpose_ = purpose;
   this->state_ = State::MOVING;
+  const float target = op == COVER_OPERATION_OPENING ? COVER_OPEN : COVER_CLOSED;
+  this->move_expected_ms_ = static_cast<uint32_t>(std::fabs(target - this->position) * this->move_duration_());
   this->move_start_ = now;
   this->last_sample_ = now;
   this->last_position_update_ = now;

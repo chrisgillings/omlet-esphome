@@ -132,6 +132,7 @@ class OmletDoor : public cover::Cover, public Component {
   uint32_t last_publish_{0};
   uint32_t retry_at_{0};
   uint32_t reverse_at_{0};
+  uint32_t move_expected_ms_{0};
 
   float filtered_current_{0.0f};
   bool filter_primed_{false};
