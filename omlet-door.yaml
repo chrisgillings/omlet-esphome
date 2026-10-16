@@ -29,6 +29,10 @@ substitutions:
   # Battery divider ratio is not known yet; measure once and set it so the
   # reported value matches the real pack voltage.
   battery_multiplier: "1.0"
+  # How long a front button must be held to count as a long press.
+  long_press: 1s
+  # Leave the LCD menu after this many seconds without a button press.
+  menu_timeout: "30"
 
 esp32:
   variant: esp32s3
@@ -106,6 +110,13 @@ sensor:
       - multiply: ${battery_multiplier}
 
 interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(omlet_menu).is_active() && millis() - id(omlet_menu_touch) > id(omlet_menu_timeout_ms)) {
+            id(omlet_menu).hide();
+          }
+
   - interval: ${sensor_interval}
     then:
       - output.turn_on: omlet_light_sensor_enable
@@ -141,44 +152,112 @@ binary_sensor:
       mode: input
     device_class: power
 
+  # Front buttons: up, down, OK (same roles as the stock firmware). The board
+  # has external pull-downs and the buttons pull the pins high. Short presses drive the menu; at the home screen up toggles the
+  # light, down stops the door, and holding OK opens or closes the door.
   - platform: gpio
-    id: omlet_button_1
-    name: Button 1
+    id: omlet_button_up
+    name: Button Up
     pin:
       number: GPIO21
-      mode:
-        input: true
-        pullup: true
-      inverted: true
+      mode: input
     internal: true
     on_press:
-      - cover.toggle: omlet_coop_door
+      - logger.log: "Button Up pressed"
+    on_release:
+      - logger.log: "Button Up released"
+    on_multi_click:
+      - timing:
+          - ON for at most ${long_press}
+          - OFF for at least 50ms
+        then:
+          - lambda: |-
+              id(omlet_menu_touch) = millis();
+              if (id(omlet_menu).is_active()) {
+                id(omlet_menu).up();
+              } else {
+                id(omlet_coop_light).toggle().perform();
+              }
+      - timing:
+          - ON for at least ${long_press}
+        then:
+          - lambda: |-
+              id(omlet_menu_touch) = millis();
+              if (!id(omlet_menu).is_active()) {
+                id(omlet_coop_door).make_call().set_command_open().perform();
+              }
 
   - platform: gpio
-    id: omlet_button_2
-    name: Button 2
+    id: omlet_button_down
+    name: Button Down
     pin:
       number: GPIO17
-      mode:
-        input: true
-        pullup: true
-      inverted: true
+      mode: input
     internal: true
     on_press:
-      - light.toggle: omlet_coop_light
+      - logger.log: "Button Down pressed"
+    on_release:
+      - logger.log: "Button Down released"
+    on_multi_click:
+      - timing:
+          - ON for at most ${long_press}
+          - OFF for at least 50ms
+        then:
+          - lambda: |-
+              id(omlet_menu_touch) = millis();
+              if (id(omlet_menu).is_active()) {
+                id(omlet_menu).down();
+              } else {
+                id(omlet_coop_door).make_call().set_command_stop().perform();
+              }
+      - timing:
+          - ON for at least ${long_press}
+        then:
+          - lambda: |-
+              id(omlet_menu_touch) = millis();
+              if (!id(omlet_menu).is_active()) {
+                id(omlet_coop_door).make_call().set_command_close().perform();
+              }
 
   - platform: gpio
-    id: omlet_button_3
-    name: Button 3
+    id: omlet_button_ok
+    name: Button OK
     pin:
       number: GPIO18
-      mode:
-        input: true
-        pullup: true
-      inverted: true
+      mode: input
     internal: true
     on_press:
-      - cover.stop: omlet_coop_door
+      - logger.log: "Button OK pressed"
+    on_release:
+      - logger.log: "Button OK released"
+    on_multi_click:
+      - timing:
+          - ON for at most ${long_press}
+          - OFF for at least 50ms
+        then:
+          - lambda: |-
+              id(omlet_menu_touch) = millis();
+              if (id(omlet_menu).is_active()) {
+                id(omlet_menu).enter();
+              } else {
+                id(omlet_menu).show();
+              }
+      - timing:
+          - ON for at least ${long_press}
+        then:
+          - lambda: |-
+              id(omlet_menu_touch) = millis();
+              if (id(omlet_menu).is_active()) {
+                id(omlet_menu).hide();
+              } else {
+                auto call = id(omlet_coop_door).make_call();
+                if (id(omlet_coop_door).is_fully_open()) {
+                  call.set_command_close();
+                } else {
+                  call.set_command_open();
+                }
+                call.perform();
+              }
 
 cover:
   - platform: omlet_door
@@ -236,17 +315,77 @@ display:
     contrast: ${lcd_contrast}
     update_interval: 1s
     lambda: |-
-      it.print(0, 0, "Coop Door");
-      if (id(omlet_coop_door).has_fault()) {
-        it.print(0, 1, "FAULT");
-      } else if (id(omlet_coop_door).current_operation == COVER_OPERATION_OPENING) {
-        it.print(0, 1, "Opening...");
-      } else if (id(omlet_coop_door).current_operation == COVER_OPERATION_CLOSING) {
-        it.print(0, 1, "Closing...");
-      } else if (id(omlet_coop_door).is_fully_open()) {
-        it.print(0, 1, "Open");
-      } else if (id(omlet_coop_door).is_fully_closed()) {
-        it.print(0, 1, "Closed");
-      } else {
-        it.printf(0, 1, "%.0f%%", id(omlet_coop_door).position * 100);
+      if (id(omlet_menu).is_active()) {
+        id(omlet_menu).draw();
+        return;
       }
+      auto *door = id(omlet_coop_door);
+      if (door->has_fault()) {
+        it.print(0, 0, "Door Fault");
+      } else if (door->current_operation == COVER_OPERATION_OPENING) {
+        it.print(0, 0, "Opening..");
+      } else if (door->current_operation == COVER_OPERATION_CLOSING) {
+        it.print(0, 0, "Closing..");
+      } else if (door->is_fully_open()) {
+        it.print(0, 0, "Open");
+      } else if (door->is_fully_closed()) {
+        it.print(0, 0, "Closed");
+      } else {
+        it.printf(0, 0, "Door %.0f%%", door->position * 100);
+      }
+      if (door->has_fault()) {
+        it.print(0, 1, "Hold OK to retry");
+      } else if (door->current_operation != COVER_OPERATION_IDLE) {
+        it.print(0, 1, "Down to stop");
+      } else if (door->is_fully_open()) {
+        it.print(0, 1, "Hold OK to close");
+      } else {
+        it.print(0, 1, "Hold OK to open");
+      }
+
+time:
+  - platform: sntp
+    id: omlet_time
+
+globals:
+  - id: omlet_menu_touch
+    type: uint32_t
+    initial_value: "0"
+  - id: omlet_menu_timeout_ms
+    type: uint32_t
+    initial_value: "${menu_timeout} * 1000UL"
+
+lcd_menu:
+  id: omlet_menu
+  display_id: omlet_lcd
+  active: false
+  mode: rotary
+  items:
+    - type: label
+      text: !lambda |-
+        auto now = id(omlet_time).now();
+        if (!now.is_valid()) {
+          return std::string("Time --:--");
+        }
+        return str_sprintf("Time %02u:%02u", now.hour, now.minute);
+    - type: label
+      text: !lambda |-
+        return str_sprintf("Light %.2f", id(omlet_light_level).state);
+    - type: label
+      text: !lambda |-
+        return str_sprintf("Battery %.2f", id(omlet_battery_voltage).state);
+    - type: label
+      text: !lambda |-
+        return std::string(wifi::global_wifi_component->is_connected() ? "Wifi Connected" : "Wifi Not Connected");
+    - type: menu
+      text: Calibrate
+      items:
+        - type: command
+          text: Start
+          on_value:
+            - display_menu.hide: omlet_menu
+            - omlet_door.calibrate: omlet_coop_door
+        - type: back
+          text: Back
+    - type: back
+      text: Exit

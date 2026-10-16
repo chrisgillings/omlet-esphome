@@ -52,8 +52,11 @@ The package provides:
 - `light` "Coop Light" on the COOP LIGHT connector.
 - `sensor` for ambient light level and battery voltage, each powered up only while sampling.
 - `binary_sensor` for the crush switch and 12 V mains presence.
-- The three front buttons wired to toggle the door, toggle the light, and stop.
-- `display` on the built-in LCD (`lcd_st7032` platform) showing door state.
+- The three front buttons as up, down and OK, like the stock panel. At the home screen a tap on up toggles the
+  coop light, a tap on down stops the door, and holding OK opens or closes it (hold up or down to pick a
+  direction). A tap on OK opens a menu on the LCD showing the time, light level, battery, Wi-Fi status and a
+  calibrate command; up and down scroll, OK selects, holding OK or thirty seconds of silence leaves it.
+- `display` on the built-in LCD (`lcd_st7032` platform) showing door state and what the buttons do.
 
 ## Hardware
 
@@ -90,9 +93,9 @@ Recovered from the stock firmware's pin table and its call sites.
 | 13 | H-bridge high-side A | Motor |
 | 14 | H-bridge low-side B | Motor |
 | 15 / 16 | 32.768 kHz crystal | |
-| 17 | Button | Front panel |
-| 18 | Button | Front panel |
-| 21 | Button | Front panel |
+| 17 | Middle button (down) | Active high, external pull-down |
+| 18 | Right button (OK) | Active high, external pull-down |
+| 21 | Left button (up) | Active high, external pull-down |
 | 40 | Crush switch input | Yellow pair on the DOOR connector, interrupt driven |
 | 42 | Prod Test header input | Low enters production test mode in stock firmware |
 | 43 / 44 | UART0 TX / RX | Serial header HDR2 |
