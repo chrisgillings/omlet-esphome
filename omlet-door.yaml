@@ -62,7 +62,9 @@ output:
 
   - platform: gpio
     id: omlet_battery_enable
-    pin: GPIO46
+    pin:
+      number: GPIO46
+      ignore_strapping_warning: true
 
 light:
   - platform: binary
@@ -92,7 +94,9 @@ sensor:
   - platform: adc
     id: omlet_battery_voltage
     name: Battery Voltage
-    pin: GPIO3
+    pin:
+      number: GPIO3
+      ignore_strapping_warning: true
     attenuation: 12db
     update_interval: never
     unit_of_measurement: V
@@ -187,7 +191,9 @@ cover:
     high_side_b: GPIO13
     low_side_b: GPIO12
     current_sampler: omlet_motor_current
-    current_enable_pin: GPIO45
+    current_enable_pin:
+      number: GPIO45
+      ignore_strapping_warning: true
     crush_pin:
       number: GPIO40
       mode: input
