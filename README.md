@@ -6,12 +6,14 @@ The stock control panel is an ESP32-S3 that only talks to Omlet's cloud. This pr
 ESPHome so the door works fully locally with Home Assistant. The stock module has no secure boot and no flash
 encryption, so it can be flashed over the serial header and restored from a backup at any time.
 
-> **Status: untested, work in progress.**
-> Nothing here has run on a real door yet. The pin map and protocol details were recovered by disassembling the
-> stock firmware (1.0.55), and the ESPHome components and package were mostly generated from that analysis with
-> AI assistance. They compile, but motor direction, crush switch polarity, LCD pin polarities and the ADC scaling
-> are all unverified. Do not flash this onto a door you rely on until it has been bench-tested. Back up your stock
-> firmware first (see below) so you can always go back.
+> **Status: works on a real door, still work in progress.**
+> The pin map and protocol details were recovered by disassembling the stock firmware (1.0.55), and the ESPHome
+> components and package were mostly generated from that analysis with AI assistance. First tested on a door on
+> 2026-10-16: it boots, finds the LCD on I2C, drives the motor the right way, detects both end stops from the motor
+> current and completes calibration (about 12 s of travel each way, running current ~0.08 V, stall ~0.55 V at the
+> ADC). The crush switch stays clear with the door fully closed. Not yet checked: LCD output and backlight
+> polarity, obstruction handling with a real object, the coop light output, and the light sensor and battery
+> scaling. Back up your stock firmware first (see below) so you can always go back.
 
 ## Usage
 
@@ -58,7 +60,7 @@ The package provides:
 - ESP32-S3-WROOM-1 N16R8 (16 MB flash, 8 MB PSRAM), 40 MHz crystal, 32.768 kHz crystal on GPIO15/16
 - Power: 12 V barrel jack or 4×AA backup, two buck regulators
 - Serial header `HDR2` (through-hole, next to the module): `0V / RX-I / TX-O`, 115200 8N1, 3.3 V logic
-- Download mode: hold the back-side **RESET** button (GPIO0) while applying power
+- Download mode: hold the **RESET** button (SW4, GPIO0) while pressing **RESTART** (SW5, EN) or applying power
 - I2C character LCD (chip-on-glass, ST7032-class) 2×16 at address 0x3E
 - Discrete H-bridge for the door motor built from two dual-MOSFET SOIC-8s with low-side shunts for current sensing
 - 4-pin Molex "DOOR" (same as a 4-pin ATX plug): black pair = motor, yellow pair = crush switch
@@ -105,8 +107,8 @@ Only two of the four bridge pins are ever high at once:
 
 | State | Pins high |
 |-------|-----------|
-| Forward | GPIO13 + GPIO14 |
-| Reverse | GPIO11 + GPIO12 |
+| Open (stock "reverse") | GPIO11 + GPIO12 |
+| Close (stock "forward") | GPIO13 + GPIO14 |
 | Stop (brake) | GPIO12 + GPIO14 |
 
 Stop shorts the motor through both low-side FETs and is held while parked. The stock firmware drives all four pins
@@ -150,7 +152,7 @@ Cursor is `0x80 | col` for line 1 and `0xC0 | col` for line 2. Custom glyphs are
 ## Flashing and recovery
 
 1. Solder a 3-pin header on HDR2 and connect a 3.3 V USB-serial adapter: GND to 0V, adapter TX to RX-I, adapter RX to TX-O. Do not connect VCC.
-2. Hold RESET, apply power, release.
+2. Hold RESET, press RESTART (or apply power), release RESET.
 3. Back up the stock flash before anything else:
    ```
    esptool --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 read-flash 0 0x1000000 omlet-stock-backup.bin
