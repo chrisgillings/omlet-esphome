@@ -2,6 +2,7 @@ from esphome import automation, pins
 import esphome.codegen as cg
 from esphome.components import cover, voltage_sampler
 import esphome.config_validation as cv
+from esphome.core import ID
 from esphome.const import (
     CONF_CLOSE_DURATION,
     CONF_ID,
@@ -120,7 +121,7 @@ async def to_code(config: ConfigType) -> None:
     synchronous=True,
 )
 async def calibrate_action_to_code(
-    config: ConfigType, action_id: cg.ID, template_arg: cg.TemplateArguments, args
+    config: ConfigType, action_id: ID, template_arg: cg.TemplateArguments, args
 ) -> cg.MockObj:
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
