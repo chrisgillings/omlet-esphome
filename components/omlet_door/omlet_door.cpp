@@ -157,6 +157,9 @@ void OmletDoor::loop() {
 
       if (now - this->last_publish_ >= PUBLISH_INTERVAL_MS) {
         this->last_publish_ = now;
+        ESP_LOGD(TAG, "%s %" PRIu32 " ms: current %.3f V, threshold %.3f V, min %.3f V, crush %s",
+                 this->move_op_ == COVER_OPERATION_CLOSING ? "Closing" : "Opening", elapsed, this->filtered_current_,
+                 this->effective_threshold_(), this->effective_min_current_(), YESNO(this->crush_active_()));
         this->publish_state(false);
       }
       break;

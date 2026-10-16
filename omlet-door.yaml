@@ -177,10 +177,12 @@ cover:
   - platform: omlet_door
     id: omlet_coop_door
     name: ${door_name}
-    high_side_a: GPIO13
-    low_side_a: GPIO12
-    high_side_b: GPIO11
-    low_side_b: GPIO14
+    # Stock firmware: open = GPIO11 + GPIO12, close = GPIO13 + GPIO14,
+    # brake = GPIO12 + GPIO14 (the two low sides).
+    high_side_a: GPIO11
+    low_side_a: GPIO14
+    high_side_b: GPIO13
+    low_side_b: GPIO12
     current_sampler: omlet_motor_current
     current_enable_pin: GPIO45
     crush_pin:
