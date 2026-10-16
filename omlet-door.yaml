@@ -85,15 +85,24 @@ sensor:
     update_interval: never
     internal: true
 
+  # Scaled the way the stock firmware does: 12-bit counts / 4 minus a dark
+  # offset, with the slope halved above 50, so 100 % is reached at about 0.46 V.
   - platform: adc
     id: omlet_light_level
     name: Light Level
     pin: GPIO1
     attenuation: 12db
     update_interval: never
-    unit_of_measurement: V
-    accuracy_decimals: 2
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
     icon: mdi:brightness-6
+    filters:
+      - lambda: |-
+          float level = x * 4095.0f / 3.1f / 4.0f - 3.0f;
+          if (level > 50.0f) {
+            level = 50.0f + (level - 50.0f) / 2.0f;
+          }
+          return std::clamp(level, 0.0f, 100.0f);
 
   - platform: adc
     id: omlet_battery_voltage
@@ -370,7 +379,7 @@ lcd_menu:
         return str_sprintf("Time %02u:%02u", now.hour, now.minute);
     - type: label
       text: !lambda |-
-        return str_sprintf("Light %.2f", id(omlet_light_level).state);
+        return str_sprintf("Light %.0f%%", id(omlet_light_level).state);
     - type: label
       text: !lambda |-
         return str_sprintf("Battery %.2f", id(omlet_battery_voltage).state);

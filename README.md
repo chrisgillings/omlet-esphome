@@ -154,7 +154,10 @@ Cursor is `0x80 | col` for line 1 and `0xC0 | col` for line 2. Custom glyphs are
 
 ## Flashing and recovery
 
-1. Solder a 3-pin header on HDR2 and connect a 3.3 V USB-serial adapter: GND to 0V, adapter TX to RX-I, adapter RX to TX-O. Do not connect VCC.
+1. Connect a 3.3 V USB-serial adapter to HDR2: GND to 0V, adapter TX to RX-I, adapter RX to TX-O. Do not connect
+   VCC. Soldering a 3-pin header is the tidy way, but for a one-off flash you can just push three header pins (or
+   the stripped ends of the jumper wires) into the holes and lean them to one side so they press against the
+   plating; that is enough contact for the few seconds it takes.
 2. Hold RESET, press RESTART (or apply power), release RESET.
 3. Back up the stock flash before anything else:
    ```
