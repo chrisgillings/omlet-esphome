@@ -82,7 +82,7 @@ The package provides:
 - Discrete H-bridge for the door motor built from two dual-MOSFET SOIC-8s with low-side shunts for current sensing
 - 4-pin Molex "DOOR" (same as a 4-pin ATX plug): black pair = motor, yellow pair = crush switch
 - 2-pin Molex "COOP LIGHT" for the Omlet coop light accessory
-- 5-pin "I2C COMS" header: `V+ / NT / SCL / SDA / 0V` (shares the LCD I2C bus)
+- 5-pin "I2C COMS" header `HDR4`: `V+ / NT / SCL / SDA / 0V` (shares the LCD I2C bus), see below
 - 2-pin "Prod Test" header `HDR5` on GPIO42, see below
 
 ## Pin map
@@ -95,7 +95,7 @@ Recovered from the stock firmware's pin table and its call sites.
 | 1  | ADC1_CH0 ambient light sensor | Enabled by GPIO2; stock firmware reads it from the ULP during deep sleep |
 | 2  | Light sensor enable | Active low; pulled low only while sampling |
 | 3  | ADC1_CH2 battery voltage | Divider enabled by GPIO46 |
-| 4  | I2C SCL | LCD and the I2C COMS header |
+| 4  | I2C SCL | LCD and the I2C COMS header `HDR4` |
 | 5  | I2C SDA | |
 | 6  | LCD reset | Active low, pulsed at init |
 | 7  | LCD power enable | Driven low at init, high to switch the display off (probably P-FET) |
@@ -184,6 +184,29 @@ binary_sensor:
         pullup: true
       inverted: true
 ```
+
+## I2C COMS header (HDR4)
+
+`HDR4` is the 5-pin through-hole header marked "I2C COMS" on the back of the board, silkscreened pin 5 to 1 as
+`V+ / NT / SCL / SDA / 0V`. SCL and SDA are the same bus the LCD uses (GPIO4 and GPIO5, 100 kHz, internal
+pull-ups on), so any I2C sensor can be added to your config without touching the package, as long as it does not
+use the LCD's address 0x3E:
+
+```yaml
+sensor:
+  - platform: sht3xd
+    temperature:
+      name: Coop Temperature
+    humidity:
+      name: Coop Humidity
+    address: 0x44
+```
+
+Two things are still unknown and worth checking with a meter before connecting anything. `V+` is probably the
+3.3 V rail, but it has not been measured, so confirm it before powering a sensor from it. `NT` looks like an
+interrupt line, but the stock firmware's pin table has no spare input assigned to it, so it is either an unrouted
+pad or a GPIO the stock firmware never used; the production test's GPIO dump (see HDR5 above) would show which.
+Keep leads short: the bus runs at 100 kHz with only the ESP32's internal pull-ups.
 
 ## Planned
 
