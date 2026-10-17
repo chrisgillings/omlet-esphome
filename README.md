@@ -206,7 +206,7 @@ Two things are still unknown and worth checking with a meter before connecting a
 3.3 V rail, but it has not been measured, so confirm it before powering a sensor from it. `NT` looks like an
 interrupt line, but the stock firmware's pin table has no spare input assigned to it, so it is either an unrouted
 pad or a GPIO the stock firmware never used; the production test's GPIO dump (see HDR5 above) would show which.
-Keep leads short: the bus runs at 100 kHz with only the ESP32's internal pull-ups.
+Keep leads short: the bus runs at 100 kHz and may have nothing but the ESP32's internal pull-ups.
 
 ## Planned
 
