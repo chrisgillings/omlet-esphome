@@ -8,11 +8,10 @@ encryption, so it can be flashed over the serial header and restored from a back
 
 > **Status: works on a real door, still work in progress.**
 > The pin map and protocol details were recovered by disassembling the stock firmware (1.0.55), and the ESPHome
-> components and package were mostly generated from that analysis with AI assistance. Tested on a door from
-> 2026-10-16: it boots, drives the LCD and its backlight, drives the motor the right way, detects both end stops
-> from the motor current and completes calibration (about 12 s of travel each way, running current ~0.08 V, stall
-> ~0.55 V at the ADC), reverses on the crush switch while closing, and switches the coop light. Run the door from
-> the 12 V adapter only: this firmware never sleeps, so a set of AA batteries would be flat within days.
+> components and package were mostly generated from that analysis with AI assistance. Tested on a real door: LCD
+> and backlight, motor direction, end stops and calibration, crush reversal and the coop light all work. Run it
+> from the 12 V adapter only: the firmware does not sleep yet, so AA batteries would go flat within days. Battery
+> operation with deep sleep is planned (see below).
 
 ## Usage
 
