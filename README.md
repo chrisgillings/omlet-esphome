@@ -11,9 +11,8 @@ encryption, so it can be flashed over the serial header and restored from a back
 > components and package were mostly generated from that analysis with AI assistance. Tested on a door from
 > 2026-10-16: it boots, drives the LCD and its backlight, drives the motor the right way, detects both end stops
 > from the motor current and completes calibration (about 12 s of travel each way, running current ~0.08 V, stall
-> ~0.55 V at the ADC), reverses on the crush switch while closing, and switches the coop light. Not yet checked:
-> obstruction detection from motor current with a real object, and the light sensor and battery scaling. Back up
-> your stock firmware first (see below) so you can always go back.
+> ~0.55 V at the ADC), reverses on the crush switch while closing, and switches the coop light. Run the door from
+> the 12 V adapter only: this firmware never sleeps, so a set of AA batteries would be flat within days.
 
 ## Usage
 
