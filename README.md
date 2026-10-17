@@ -83,7 +83,7 @@ The package provides:
 - 4-pin Molex "DOOR" (same as a 4-pin ATX plug): black pair = motor, yellow pair = crush switch
 - 2-pin Molex "COOP LIGHT" for the Omlet coop light accessory
 - 5-pin "I2C COMS" header: `V+ / NT / SCL / SDA / 0V` (shares the LCD I2C bus)
-- 2-pin "Prod Test" header
+- 2-pin "Prod Test" header `HDR5` on GPIO42, see below
 
 ## Pin map
 
@@ -111,7 +111,7 @@ Recovered from the stock firmware's pin table and its call sites.
 | 18 | Right button (OK) | Active high, external pull-down |
 | 21 | Left button (up) | Active high, external pull-down |
 | 40 | Crush switch input | Yellow pair on the DOOR connector, interrupt driven |
-| 42 | Prod Test header input | Low enters production test mode in stock firmware |
+| 42 | Prod Test header `HDR5` input | Low at boot enters production test mode in stock firmware; unused by this package |
 | 43 / 44 | UART0 TX / RX | Serial header HDR2 |
 | 45 | Motor current amplifier enable | Active high |
 | 46 | Battery divider enable | Active high |
@@ -159,6 +159,31 @@ Init after the reset pulse on GPIO6:
 
 Cursor is `0x80 | col` for line 1 and `0xC0 | col` for line 2. Custom glyphs are loaded through CGRAM
 (`0x40 | (index << 3)` then eight rows).
+
+## Prod Test header (HDR5)
+
+`HDR5` is the 2-pin through-hole header marked "Prod Test" on the front of the board: one pin is ground, the
+other is GPIO42, which reads high unless the header is shorted. As far as the disassembly shows, the stock firmware
+checks it at boot and, if it is shorted, runs Omlet's factory self-test instead of the normal application: it shows "PTest Started" on the LCD, then steps through a display test, a
+button test, the light sensor and coop light current, motor current, sleep current and the crush switch, prints
+every GPIO's configuration over the serial header, and ends with "PTest Passed" or "PTest Failed". While it runs
+the firmware skips its usual coop-light detection ("not updating equipped status"). It is only useful with the
+stock firmware and may rewrite calibration data in NVS, so take a flash backup before trying it.
+
+This package does not use GPIO42, so the header is a free spare input. With the internal pull-up enabled a
+switch or reed contact between its two pins reads low when closed:
+
+```yaml
+binary_sensor:
+  - platform: gpio
+    name: Spare Input
+    pin:
+      number: GPIO42
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+```
 
 ## Planned
 
