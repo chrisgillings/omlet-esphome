@@ -8,12 +8,12 @@ encryption, so it can be flashed over the serial header and restored from a back
 
 > **Status: works on a real door, still work in progress.**
 > The pin map and protocol details were recovered by disassembling the stock firmware (1.0.55), and the ESPHome
-> components and package were mostly generated from that analysis with AI assistance. First tested on a door on
-> 2026-10-16: it boots, finds the LCD on I2C, drives the motor the right way, detects both end stops from the motor
-> current and completes calibration (about 12 s of travel each way, running current ~0.08 V, stall ~0.55 V at the
-> ADC). The crush switch stays clear with the door fully closed. Not yet checked: LCD output and backlight
-> polarity, obstruction handling with a real object, the coop light output, and the light sensor and battery
-> scaling. Back up your stock firmware first (see below) so you can always go back.
+> components and package were mostly generated from that analysis with AI assistance. Tested on a door from
+> 2026-10-16: it boots, drives the LCD and its backlight, drives the motor the right way, detects both end stops
+> from the motor current and completes calibration (about 12 s of travel each way, running current ~0.08 V, stall
+> ~0.55 V at the ADC), reverses on the crush switch while closing, and switches the coop light. Not yet checked:
+> obstruction detection from motor current with a real object, and the light sensor and battery scaling. Back up
+> your stock firmware first (see below) so you can always go back.
 
 ## Usage
 
@@ -57,6 +57,8 @@ The package provides:
   direction). A tap on OK opens a menu on the LCD showing the time, light level, battery, Wi-Fi status and a
   calibrate command; up and down scroll, OK selects, holding OK or thirty seconds of silence leaves it.
 - `display` on the built-in LCD (`lcd_st7032` platform) showing door state and what the buttons do.
+- `switch` "LCD Backlight". It comes on with any button press or door movement and goes off after
+  `menu_timeout` seconds of inactivity, the same timeout the LCD menu uses.
 
 ## Flashing and recovery
 
@@ -115,7 +117,7 @@ Recovered from the stock firmware's pin table and its call sites.
 | 43 / 44 | UART0 TX / RX | Serial header HDR2 |
 | 45 | Motor current amplifier enable | Active high |
 | 46 | Battery divider enable | Active high |
-| 47 | LCD backlight | Polarity to confirm |
+| 47 | LCD backlight | Active low, confirmed on the door |
 | 48 | 12 V adapter present | Input, high when mains adapter is connected |
 
 ## Motor control

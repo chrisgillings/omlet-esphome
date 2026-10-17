@@ -21,9 +21,6 @@ substitutions:
   max_crush_retries: "3"
   crush_retry_delay: 10s
   lcd_contrast: "22"
-  # The stock firmware drives GPIO7 low to power the display.
-  lcd_enable_inverted: "true"
-  lcd_backlight_inverted: "false"
   # How often to sample the light sensor and battery.
   sensor_interval: 60s
   # Battery divider ratio is not known yet; measure once and set it so the
@@ -31,7 +28,8 @@ substitutions:
   battery_multiplier: "1.0"
   # How long a front button must be held to count as a long press.
   long_press: 1s
-  # Leave the LCD menu after this many seconds without a button press.
+  # Leave the LCD menu and switch the backlight off after this many seconds
+  # without a button press or door movement.
   menu_timeout: "30"
 
 esp32:
@@ -122,8 +120,19 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
-          if (id(omlet_menu).is_active() && millis() - id(omlet_menu_touch) > id(omlet_menu_timeout_ms)) {
-            id(omlet_menu).hide();
+          if (id(omlet_coop_door)->current_operation != COVER_OPERATION_IDLE) {
+            id(omlet_menu_touch) = millis();
+            if (!id(omlet_backlight).state) {
+              id(omlet_backlight).turn_on();
+            }
+          }
+          if (millis() - id(omlet_menu_touch) > id(omlet_menu_timeout_ms)) {
+            if (id(omlet_menu).is_active()) {
+              id(omlet_menu).hide();
+            }
+            if (id(omlet_backlight).state) {
+              id(omlet_backlight).turn_off();
+            }
           }
 
   - interval: ${sensor_interval}
@@ -173,6 +182,8 @@ binary_sensor:
     internal: true
     on_press:
       - logger.log: "Button Up pressed"
+      - lambda: id(omlet_menu_touch) = millis();
+      - switch.turn_on: omlet_backlight
     on_release:
       - logger.log: "Button Up released"
     on_multi_click:
@@ -205,6 +216,8 @@ binary_sensor:
     internal: true
     on_press:
       - logger.log: "Button Down pressed"
+      - lambda: id(omlet_menu_touch) = millis();
+      - switch.turn_on: omlet_backlight
     on_release:
       - logger.log: "Button Down released"
     on_multi_click:
@@ -237,6 +250,8 @@ binary_sensor:
     internal: true
     on_press:
       - logger.log: "Button OK pressed"
+      - lambda: id(omlet_menu_touch) = millis();
+      - switch.turn_on: omlet_backlight
     on_release:
       - logger.log: "Button OK released"
     on_multi_click:
@@ -307,6 +322,20 @@ button:
     on_press:
       - omlet_door.calibrate: omlet_coop_door
 
+switch:
+  - platform: template
+    id: omlet_backlight
+    name: LCD Backlight
+    entity_category: config
+    optimistic: true
+    restore_mode: ALWAYS_ON
+    turn_on_action:
+      - lambda: |-
+          id(omlet_menu_touch) = millis();
+          id(omlet_lcd).backlight();
+    turn_off_action:
+      - lambda: id(omlet_lcd).no_backlight();
+
 display:
   - platform: lcd_st7032
     id: omlet_lcd
@@ -314,11 +343,11 @@ display:
     address: 0x3E
     enable_pin:
       number: GPIO7
-      inverted: ${lcd_enable_inverted}
+      inverted: true
     reset_pin: GPIO6
     backlight_pin:
       number: GPIO47
-      inverted: ${lcd_backlight_inverted}
+      inverted: true
     contrast: ${lcd_contrast}
     update_interval: 1s
     lambda: |-
